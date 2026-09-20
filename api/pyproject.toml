@@ -1,0 +1,88 @@
+[project]
+name = "terraspectra-api"
+version = "1.0.0"
+description = "TerraSpectra inference API: chunked GPU inference, risk rasters, zones and map tiles."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "terraspectra-contracts[raster,torch]",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    "python-multipart>=0.0.9",
+    "sqlalchemy>=2.0",
+    "alembic>=1.13",
+    "psycopg[binary]>=3.2",
+    "rq>=1.16",
+    "redis>=5.0",
+    "numpy>=1.26",
+    "scipy>=1.13",
+    "shapely>=2.0",
+    "pyproj>=3.6",
+    "rasterio>=1.3.10",
+    "rio-tiler>=7.0",
+    "prometheus-fastapi-instrumentator>=7.0",
+]
+
+[project.scripts]
+terraspectra-api = "terraspectra_api.__main__:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/terraspectra_api"]
+
+[tool.uv.sources]
+terraspectra-contracts = { path = "../contracts/python", editable = true }
+
+[dependency-groups]
+dev = [
+    "pytest>=8.2",
+    "pytest-cov>=5.0",
+    "httpx>=0.27",
+    "jsonschema>=4.22",
+    "pyyaml>=6.0",
+    "ruff>=0.6",
+    "mypy>=1.11",
+    "types-pyyaml",
+    "types-jsonschema",
+    "types-shapely",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["alembic/versions"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "N", "RUF"]
+ignore = ["B008"]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.File", "fastapi.Form", "fastapi.Query", "fastapi.Path", "fastapi.Header"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["terraspectra_api", "terraspectra_contracts"]
+
+[tool.mypy]
+files = ["src"]
+ignore_missing_imports = true
+disallow_untyped_defs = true
+warn_unused_ignores = true
+plugins = ["pydantic.mypy"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+filterwarnings = [
+    "ignore::FutureWarning",
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+    "ignore::rasterio.errors.NotGeoreferencedWarning",
+]
+
+[tool.coverage.run]
+source = ["terraspectra_api"]
