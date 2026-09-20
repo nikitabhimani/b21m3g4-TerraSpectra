@@ -1,0 +1,128 @@
+{
+  "type": "FeatureCollection",
+  "job_id": "job_sample",
+  "scene_id": "scn_sample",
+  "generated_at": "2026-09-17T00:00:00Z",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              75.862313,
+              30.909842
+            ],
+            [
+              75.863802,
+              30.909842
+            ],
+            [
+              75.863802,
+              30.91112
+            ],
+            [
+              75.862313,
+              30.91112
+            ],
+            [
+              75.862313,
+              30.909842
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "zone_id": "z-001",
+        "risk_class": 2,
+        "risk_class_name": "high_blight_risk",
+        "risk_score": 0.91,
+        "area_acres": 5.0,
+        "days_to_onset": 21.0,
+        "dominant_indicator": "red_edge_shift",
+        "recommended_action": "Apply targeted preventative fungicide within 7 days"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              75.854112,
+              30.904432
+            ],
+            [
+              75.856419,
+              30.904432
+            ],
+            [
+              75.856419,
+              30.906411
+            ],
+            [
+              75.854112,
+              30.906411
+            ],
+            [
+              75.854112,
+              30.904432
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "zone_id": "z-002",
+        "risk_class": 1,
+        "risk_class_name": "early_stress",
+        "risk_score": 0.64,
+        "area_acres": 12.0,
+        "days_to_onset": 26.0,
+        "dominant_indicator": "pri_decline",
+        "recommended_action": "Increase scouting frequency; re-image in 5 days"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              75.86644,
+              30.903264
+            ],
+            [
+              75.867256,
+              30.903264
+            ],
+            [
+              75.867256,
+              30.903964
+            ],
+            [
+              75.86644,
+              30.903964
+            ],
+            [
+              75.86644,
+              30.903264
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "zone_id": "z-003",
+        "risk_class": 3,
+        "risk_class_name": "visible_disease",
+        "risk_score": 0.97,
+        "area_acres": 1.5,
+        "days_to_onset": 0.0,
+        "dominant_indicator": "chlorophyll_loss",
+        "recommended_action": "Immediate treatment and ground-truth inspection"
+      }
+    }
+  ]
+}

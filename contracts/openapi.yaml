@@ -1,0 +1,290 @@
+openapi: 3.1.0
+info:
+  title: TerraSpectra Inference API
+  version: 1.0.0
+  description: Contract C3. Hyperspectral crop-disease forecasting service.
+servers:
+  - url: http://localhost:8000
+security:
+  - ApiKeyAuth: []
+paths:
+  /v1/health:
+    get:
+      operationId: getHealth
+      security: []
+      responses:
+        "200":
+          description: Service health
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+  /v1/fields:
+    get:
+      operationId: listFields
+      responses:
+        "200":
+          description: Farm field boundaries
+          content:
+            application/geo+json:
+              schema: { $ref: "#/components/schemas/FieldCollection" }
+  /v1/scenes:
+    get:
+      operationId: listScenes
+      responses:
+        "200":
+          description: Registered scenes
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Scene" }
+    post:
+      operationId: createScene
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file: { type: string, format: binary, description: C1-compliant COG }
+                uri: { type: string, description: "Alternative to upload: s3:// or file:// URI" }
+                name: { type: string }
+      responses:
+        "201":
+          description: Scene registered
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Scene" }
+        "422": { $ref: "#/components/responses/Error" }
+  /v1/scenes/{scene_id}:
+    get:
+      operationId: getScene
+      parameters: [{ $ref: "#/components/parameters/SceneId" }]
+      responses:
+        "200":
+          description: Scene
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Scene" }
+        "404": { $ref: "#/components/responses/Error" }
+  /v1/jobs:
+    get:
+      operationId: listJobs
+      responses:
+        "200":
+          description: Jobs, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Job" }
+    post:
+      operationId: createJob
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/JobCreate" }
+      responses:
+        "202":
+          description: Job queued
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Job" }
+        "404": { $ref: "#/components/responses/Error" }
+  /v1/jobs/{job_id}:
+    get:
+      operationId: getJob
+      parameters: [{ $ref: "#/components/parameters/JobId" }]
+      responses:
+        "200":
+          description: Job status
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Job" }
+        "404": { $ref: "#/components/responses/Error" }
+  /v1/jobs/{job_id}/zones:
+    get:
+      operationId: getJobZones
+      parameters: [{ $ref: "#/components/parameters/JobId" }]
+      responses:
+        "200":
+          description: Risk zones (contract C4, see zones.schema.json)
+          content:
+            application/geo+json:
+              schema: { $ref: "#/components/schemas/ZoneCollection" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /v1/jobs/{job_id}/risk.tif:
+    get:
+      operationId: getJobRiskRaster
+      parameters: [{ $ref: "#/components/parameters/JobId" }]
+      responses:
+        "200":
+          description: "COG, float32, bands 1-4 = class probabilities, band 5 = days_to_onset"
+          content:
+            image/tiff:
+              schema: { type: string, format: binary }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /v1/jobs/{job_id}/tiles/{z}/{x}/{y}.png:
+    get:
+      operationId: getJobTile
+      security: []
+      parameters:
+        - { $ref: "#/components/parameters/JobId" }
+        - { name: z, in: path, required: true, schema: { type: integer, minimum: 0, maximum: 22 } }
+        - { name: x, in: path, required: true, schema: { type: integer, minimum: 0 } }
+        - { name: y, in: path, required: true, schema: { type: integer, minimum: 0 } }
+      responses:
+        "200":
+          description: 256x256 RGBA heatmap tile (transparent outside data)
+          content:
+            image/png:
+              schema: { type: string, format: binary }
+        "404": { $ref: "#/components/responses/Error" }
+components:
+  securitySchemes:
+    ApiKeyAuth: { type: apiKey, in: header, name: X-API-Key }
+  parameters:
+    JobId: { name: job_id, in: path, required: true, schema: { type: string } }
+    SceneId: { name: scene_id, in: path, required: true, schema: { type: string } }
+  responses:
+    Error:
+      description: Error
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+  schemas:
+    Error:
+      type: object
+      required: [detail]
+      properties:
+        detail: { type: string }
+        code: { type: string }
+    Health:
+      type: object
+      required: [status, version, device, model_loaded]
+      properties:
+        status: { type: string, enum: [ok, degraded] }
+        version: { type: string }
+        device: { type: string, examples: [cuda:0, cpu] }
+        model_loaded: { type: boolean }
+    Scene:
+      type: object
+      required: [scene_id, name, uri, width, height, bands, crs, created_at]
+      properties:
+        scene_id: { type: string }
+        name: { type: string }
+        uri: { type: string }
+        width: { type: integer }
+        height: { type: integer }
+        bands: { type: integer, const: 200 }
+        crs: { type: string }
+        bounds:
+          type: array
+          description: "[minLon, minLat, maxLon, maxLat] in EPSG:4326"
+          items: { type: number }
+          minItems: 4
+          maxItems: 4
+        created_at: { type: string, format: date-time }
+    JobCreate:
+      type: object
+      required: [scene_id]
+      properties:
+        scene_id: { type: string }
+        field_id: { type: [string, "null"] }
+        aoi:
+          description: Optional GeoJSON Polygon (EPSG:4326) to clip inference to
+          type: [object, "null"]
+    JobSummary:
+      type: object
+      required: [acres_analyzed, acres_at_risk, zones_by_class]
+      properties:
+        acres_analyzed: { type: number }
+        acres_at_risk: { type: number }
+        zones_by_class:
+          type: object
+          additionalProperties: { type: integer }
+    Job:
+      type: object
+      required: [job_id, scene_id, status, progress, created_at, updated_at]
+      properties:
+        job_id: { type: string }
+        scene_id: { type: string }
+        field_id: { type: [string, "null"] }
+        status: { type: string, enum: [queued, running, succeeded, failed] }
+        progress: { type: number, minimum: 0, maximum: 1 }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        error: { type: [string, "null"] }
+        summary:
+          oneOf:
+            - { $ref: "#/components/schemas/JobSummary" }
+            - { type: "null" }
+    ZoneProperties:
+      type: object
+      required: [zone_id, risk_class, risk_class_name, risk_score, area_acres, days_to_onset, dominant_indicator, recommended_action]
+      properties:
+        zone_id: { type: string }
+        risk_class: { type: integer, minimum: 0, maximum: 3 }
+        risk_class_name: { type: string, enum: [healthy, early_stress, high_blight_risk, visible_disease] }
+        risk_score: { type: number, minimum: 0, maximum: 1 }
+        area_acres: { type: number, minimum: 0 }
+        days_to_onset: { type: number, minimum: 0, maximum: 30 }
+        dominant_indicator: { type: string }
+        recommended_action: { type: string }
+    Polygon:
+      type: object
+      required: [type, coordinates]
+      properties:
+        type: { type: string, const: Polygon }
+        coordinates:
+          type: array
+          items:
+            type: array
+            items:
+              type: array
+              items: { type: number }
+    ZoneFeature:
+      type: object
+      required: [type, geometry, properties]
+      properties:
+        type: { type: string, const: Feature }
+        geometry: { $ref: "#/components/schemas/Polygon" }
+        properties: { $ref: "#/components/schemas/ZoneProperties" }
+    ZoneCollection:
+      type: object
+      required: [type, job_id, scene_id, generated_at, features]
+      properties:
+        type: { type: string, const: FeatureCollection }
+        job_id: { type: string }
+        scene_id: { type: string }
+        generated_at: { type: string, format: date-time }
+        features:
+          type: array
+          items: { $ref: "#/components/schemas/ZoneFeature" }
+    FieldProperties:
+      type: object
+      required: [field_id, name, area_acres]
+      properties:
+        field_id: { type: string }
+        name: { type: string }
+        crop: { type: string }
+        area_acres: { type: number }
+    FieldFeature:
+      type: object
+      required: [type, geometry, properties]
+      properties:
+        type: { type: string, const: Feature }
+        geometry: { $ref: "#/components/schemas/Polygon" }
+        properties: { $ref: "#/components/schemas/FieldProperties" }
+    FieldCollection:
+      type: object
+      required: [type, features]
+      properties:
+        type: { type: string, const: FeatureCollection }
+        features:
+          type: array
+          items: { $ref: "#/components/schemas/FieldFeature" }

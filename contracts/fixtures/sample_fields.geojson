@@ -1,0 +1,41 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              75.85,
+              30.9
+            ],
+            [
+              75.87106,
+              30.9
+            ],
+            [
+              75.87106,
+              30.918071
+            ],
+            [
+              75.85,
+              30.918071
+            ],
+            [
+              75.85,
+              30.9
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "field_id": "fld_demo_farm",
+        "name": "Demo Farm - Ludhiana",
+        "crop": "potato",
+        "area_acres": 1000.0
+      }
+    }
+  ]
+}

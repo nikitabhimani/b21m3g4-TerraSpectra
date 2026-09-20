@@ -1,0 +1,68 @@
+# Full stack: docker compose up --build
+# GPU:        docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build
+name: terraspectra
+
+x-api-env: &api-env
+  env_file: .env
+  volumes:
+    - scene-data:/data
+    - ./models:/models:ro
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    env_file: .env
+    volumes: [pg-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+
+  api:
+    build: { context: ., dockerfile: api/Dockerfile }
+    <<: *api-env
+    command: ["api"]
+    ports: ["8000:8000"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8000/v1/health')"]
+      interval: 10s
+      retries: 10
+
+  worker:
+    build: { context: ., dockerfile: api/Dockerfile }
+    <<: *api-env
+    command: ["worker"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: dashboard/Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+        VITE_API_KEY: ${VITE_API_KEY:-dev-key-change-me}
+    ports: ["8080:80"]
+    depends_on: [api]
+
+  pipeline:
+    build: { context: ., dockerfile: pipeline/Dockerfile }
+    profiles: [tools]
+    env_file: .env
+    volumes:
+      - ./data:/data
+
+volumes:
+  pg-data:
+  scene-data:

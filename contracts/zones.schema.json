@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://terraspectra.dev/contracts/v1/zones.schema.json",
+  "title": "TerraSpectra risk zones (contract C4)",
+  "type": "object",
+  "required": ["type", "job_id", "scene_id", "generated_at", "features"],
+  "properties": {
+    "type": { "const": "FeatureCollection" },
+    "job_id": { "type": "string" },
+    "scene_id": { "type": "string" },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "features": { "type": "array", "items": { "$ref": "#/$defs/zone" } }
+  },
+  "$defs": {
+    "zone": {
+      "type": "object",
+      "required": ["type", "geometry", "properties"],
+      "properties": {
+        "type": { "const": "Feature" },
+        "geometry": {
+          "type": "object",
+          "required": ["type", "coordinates"],
+          "properties": {
+            "type": { "const": "Polygon" },
+            "coordinates": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "minItems": 4,
+                "items": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "number" } }
+              }
+            }
+          }
+        },
+        "properties": {
+          "type": "object",
+          "required": ["zone_id", "risk_class", "risk_class_name", "risk_score", "area_acres", "days_to_onset", "dominant_indicator", "recommended_action"],
+          "properties": {
+            "zone_id": { "type": "string" },
+            "risk_class": { "type": "integer", "minimum": 0, "maximum": 3 },
+            "risk_class_name": { "enum": ["healthy", "early_stress", "high_blight_risk", "visible_disease"] },
+            "risk_score": { "type": "number", "minimum": 0, "maximum": 1 },
+            "area_acres": { "type": "number", "minimum": 0 },
+            "days_to_onset": { "type": "number", "minimum": 0, "maximum": 30 },
+            "dominant_indicator": { "type": "string" },
+            "recommended_action": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}
