@@ -186,5 +186,33 @@ def benchmark(
     typer.echo(json.dumps(run_benchmark(target, batch_size, n_batches, device), indent=2))
 
 
+@app.command(name="download-benchmarks")
+def download_benchmarks_cmd(
+    benchmark: Annotated[
+        str,
+        typer.Option("--name", "-n", help="Benchmark name (indian_pines, salinas, pavia_u, or all)."),
+    ] = "all",
+    data_dir: Annotated[
+        Path, typer.Option("--data-dir", "-d", help="Directory to save benchmark datasets.")
+    ] = Path("data/benchmarks"),
+    force: Annotated[bool, typer.Option("--force", "-f", help="Force redownload existing files.")] = False,
+) -> None:
+    """Download public benchmark datasets (Indian Pines, Salinas, Pavia U)."""
+    from terraspectra_model.data.benchmarks import BENCHMARKS, download_all_benchmarks, download_benchmark
+
+    if benchmark == "all":
+        typer.echo(f"Downloading all benchmarks to {data_dir}...")
+        results = download_all_benchmarks(data_dir, force=force)
+        for name, (cube, gt) in results.items():
+            typer.echo(f"  [OK] {name}: {cube.name}, {gt.name}")
+    elif benchmark in BENCHMARKS:
+        typer.echo(f"Downloading {benchmark} to {data_dir}...")
+        cube, gt = download_benchmark(benchmark, data_dir, force=force)
+        typer.echo(f"  [OK] {benchmark}: {cube.name}, {gt.name}")
+    else:
+        valid = ", ".join(sorted(BENCHMARKS.keys()))
+        raise typer.BadParameter(f"Unknown benchmark {benchmark!r}. Choose from: all, {valid}")
+
+
 if __name__ == "__main__":  # pragma: no cover
     app()
