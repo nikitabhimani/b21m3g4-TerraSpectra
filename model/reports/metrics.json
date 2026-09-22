@@ -1,0 +1,183 @@
+{
+  "overall_accuracy": 0.9594454562582428,
+  "macro_f1": 0.5186780632734515,
+  "miou": 0.45547179965920637,
+  "per_class_f1": {
+    "healthy": 0.9811746120554888,
+    "early_stress": 0.5748595777648654,
+    "high_blight_risk": 0.0,
+    "visible_disease": 0.0
+  },
+  "per_class_iou": {
+    "healthy": 0.9630449178686221,
+    "early_stress": 0.40337048110899704,
+    "high_blight_risk": 0.0,
+    "visible_disease": 0.0
+  },
+  "support": {
+    "healthy": 60530,
+    "early_stress": 2898,
+    "high_blight_risk": 264,
+    "visible_disease": 0
+  },
+  "confusion_matrix": [
+    [
+      59625,
+      517,
+      337,
+      51
+    ],
+    [
+      1383,
+      1484,
+      31,
+      0
+    ],
+    [
+      0,
+      264,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0
+    ]
+  ],
+  "onset_mae_days": 8.976793592601897,
+  "n_pixels": 63692,
+  "temperature": 0.12930043041706085,
+  "lead_time_curve": [
+    {
+      "days_before_symptoms": 0.0,
+      "detection_rate": 0.1962671905697446,
+      "class_accuracy": 0.0,
+      "false_alarm_rate": 0.0011561529012211866,
+      "onset_mae": 18.8685359954834,
+      "n_infected_pixels": 5090.0
+    },
+    {
+      "days_before_symptoms": 2.0,
+      "detection_rate": 0.9032459425717853,
+      "class_accuracy": 0.027777777777777776,
+      "false_alarm_rate": 0.029698281693952104,
+      "onset_mae": 6.510823726654053,
+      "n_infected_pixels": 3204.0
+    },
+    {
+      "days_before_symptoms": 4.0,
+      "detection_rate": 0.9983193277310924,
+      "class_accuracy": 0.008556149732620321,
+      "false_alarm_rate": 0.07722228577965908,
+      "onset_mae": 3.580833673477173,
+      "n_infected_pixels": 6545.0
+    },
+    {
+      "days_before_symptoms": 6.0,
+      "detection_rate": 0.9853377552801537,
+      "class_accuracy": 0.002967359050445104,
+      "false_alarm_rate": 0.05917378601279633,
+      "onset_mae": 4.78742790222168,
+      "n_infected_pixels": 5729.0
+    },
+    {
+      "days_before_symptoms": 8.0,
+      "detection_rate": 0.8714927048260381,
+      "class_accuracy": 0.8707444818555929,
+      "false_alarm_rate": 0.02541754795419736,
+      "onset_mae": 6.409473896026611,
+      "n_infected_pixels": 5346.0
+    },
+    {
+      "days_before_symptoms": 10.0,
+      "detection_rate": 0.6154809619238477,
+      "class_accuracy": 0.6094689378757515,
+      "false_alarm_rate": 0.019425910480956352,
+      "onset_mae": 7.266201019287109,
+      "n_infected_pixels": 3992.0
+    },
+    {
+      "days_before_symptoms": 12.0,
+      "detection_rate": 0.4029429550493852,
+      "class_accuracy": 0.4019350937311026,
+      "false_alarm_rate": 0.022332506203473945,
+      "onset_mae": 7.036106586456299,
+      "n_infected_pixels": 4961.0
+    },
+    {
+      "days_before_symptoms": 14.0,
+      "detection_rate": 0.41995050447363413,
+      "class_accuracy": 0.41766609556443934,
+      "false_alarm_rate": 0.010648737052516809,
+      "onset_mae": 5.231141567230225,
+      "n_infected_pixels": 5253.0
+    },
+    {
+      "days_before_symptoms": 16.0,
+      "detection_rate": 0.3004782699105843,
+      "class_accuracy": 0.29777500519858596,
+      "false_alarm_rate": 0.004148932365249115,
+      "onset_mae": 4.022564888000488,
+      "n_infected_pixels": 4809.0
+    },
+    {
+      "days_before_symptoms": 18.0,
+      "detection_rate": 0.15172681412495148,
+      "class_accuracy": 0.14396585176561894,
+      "false_alarm_rate": 0.0011588324762801477,
+      "onset_mae": 2.6972508430480957,
+      "n_infected_pixels": 5154.0
+    },
+    {
+      "days_before_symptoms": 20.0,
+      "detection_rate": 0.16823041675758238,
+      "class_accuracy": 0.16408466070259656,
+      "false_alarm_rate": 0.003228667731062622,
+      "onset_mae": 1.9480949640274048,
+      "n_infected_pixels": 4583.0
+    },
+    {
+      "days_before_symptoms": 22.0,
+      "detection_rate": 0.07327249022164277,
+      "class_accuracy": 0.07196870925684486,
+      "false_alarm_rate": 0.004804202813396468,
+      "onset_mae": 1.55237877368927,
+      "n_infected_pixels": 3835.0
+    },
+    {
+      "days_before_symptoms": 24.0,
+      "detection_rate": 0.0,
+      "class_accuracy": 0.0,
+      "false_alarm_rate": 0.0,
+      "onset_mae": 3.2383837699890137,
+      "n_infected_pixels": 5031.0
+    },
+    {
+      "days_before_symptoms": 26.0,
+      "detection_rate": 0.0,
+      "class_accuracy": 0.0,
+      "false_alarm_rate": 0.0017387601575529611,
+      "onset_mae": 5.073397636413574,
+      "n_infected_pixels": 4587.0
+    },
+    {
+      "days_before_symptoms": 28.0,
+      "detection_rate": 0.0,
+      "class_accuracy": 0.0,
+      "false_alarm_rate": 0.0016667874483658235,
+      "onset_mae": 6.797645092010498,
+      "n_infected_pixels": 5170.0
+    },
+    {
+      "days_before_symptoms": 30.0,
+      "detection_rate": 0.0,
+      "class_accuracy": 0.0,
+      "false_alarm_rate": 0.0025202520252025204,
+      "onset_mae": 9.027992248535156,
+      "n_infected_pixels": 4993.0
+    }
+  ],
+  "checkpoint": "runs\\baseline\\checkpoints\\epoch008-step81.ckpt"
+}
