@@ -8,6 +8,7 @@ scaled to reflectance (/10000), clipped to [0, 1] and resampled to the canonical
 from __future__ import annotations
 
 import logging
+import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -136,27 +137,110 @@ def _load_mat_var(path: Path, key: str) -> np.ndarray:
     return np.asarray(mat[key])
 
 
-def vegetation_mask(name: str, labels: np.ndarray) -> np.ndarray:
+def download_file(url: str, dest: Path, chunk_size: int = 1024 * 64, timeout: int = 60) -> Path:
+    """Download a file with streaming and replace atomically."""
+    dest = Path(dest)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    temp_dest = dest.with_suffix(dest.suffix + ".part")
+    log.info("downloading %s -> %s", url, dest.name)
+    req = urllib.request.Request(
+        url,
+        headers={"User-Agent": "TerraSpectra/1.0 (Hyperspectral Dataset Loader)"},
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as response, open(temp_dest, "wb") as f:
+        while chunk := response.read(chunk_size):
+            f.write(chunk)
+    temp_dest.replace(dest)
+    log.info("finished downloading %s", dest.name)
+    return dest
+
+
+def download_benchmark(
+    name: str,
+    data_dir: str | Path,
+    force: bool = False,
+) -> tuple[Path, Path]:
+    """Download a benchmark cube and its ground-truth file to ``data_dir``."""
+    if name not in BENCHMARKS:
+        raise KeyError(f"unknown benchmark {name!r}; choose from {sorted(BENCHMARKS)}")
+    spec = BENCHMARKS[name]
+    root = Path(data_dir)
+    root.mkdir(parents=True, exist_ok=True)
+    cube_path, gt_path = root / spec.cube_file, root / spec.gt_file
+
+    if len(spec.urls) < 2:
+        raise ValueError(f"{name}: spec has fewer than 2 URLs configured")
+
+    if force or not cube_path.exists():
+        download_file(spec.urls[0], cube_path)
+    else:
+        log.info("cube %s already exists at %s", name, cube_path)
+
+    if force or not gt_path.exists():
+        download_file(spec.urls[1], gt_path)
+    else:
+        log.info("ground truth %s already exists at %s", name, gt_path)
+
+    return cube_path, gt_path
+
+
+def download_all_benchmarks(
+    data_dir: str | Path,
+    names: list[str] | None = None,
+    force: bool = False,
+) -> dict[str, tuple[Path, Path]]:
+    """Download all requested (or all known) benchmarks to ``data_dir``."""
+    targets = names if names is not None else list(BENCHMARKS.keys())
+    results: dict[str, tuple[Path, Path]] = {}
+    for name in targets:
+        results[name] = download_benchmark(name, data_dir, force=force)
+    return results
+
+
+def vegetation_mask(
+    name: str,
+    labels: np.ndarray,
+    cube: np.ndarray | None = None,
+    ndvi_threshold: float | None = None,
+) -> np.ndarray:
     """Boolean mask of pixels whose benchmark class is vegetation.
 
-    TODO(Day 3): refine with an NDVI threshold so unlabelled (class 0) vegetated pixels can
-    also receive simulated stress, and drop senescent classes if they confuse training.
+    Optionally refines the mask using an NDVI threshold when ``cube`` and ``ndvi_threshold``
+    are provided, allowing unlabelled (class 0) vegetated pixels to be included.
     """
-    return np.isin(labels, sorted(BENCHMARKS[name].vegetation_classes))
+    mask = np.isin(labels, sorted(BENCHMARKS[name].vegetation_classes))
+    if cube is not None and ndvi_threshold is not None:
+        from terraspectra_model.indices import ndvi
+
+        veg_ndvi = ndvi(cube) >= ndvi_threshold
+        mask = mask | (veg_ndvi & (labels == 0))
+    return mask
 
 
-def load_benchmark(name: str, data_dir: str | Path, method: str = "linear") -> BenchmarkScene:
+def load_benchmark(
+    name: str,
+    data_dir: str | Path,
+    method: str = "linear",
+    auto_download: bool = False,
+) -> BenchmarkScene:
     """Load one benchmark from ``data_dir`` and resample it to the canonical grid."""
     if name not in BENCHMARKS:
         raise KeyError(f"unknown benchmark {name!r}; choose from {sorted(BENCHMARKS)}")
     spec = BENCHMARKS[name]
     root = Path(data_dir)
     cube_path, gt_path = root / spec.cube_file, root / spec.gt_file
-    for p in (cube_path, gt_path):
-        if not p.exists():
+
+    missing = not cube_path.exists() or not gt_path.exists()
+    if missing:
+        if auto_download:
+            log.info("%s files missing; auto_download=True, downloading...", name)
+            download_benchmark(name, root)
+        else:
             raise FileNotFoundError(
-                f"{p} missing - download it from {' or '.join(spec.urls)} (see model/README.md)"
+                f"{cube_path if not cube_path.exists() else gt_path} missing - "
+                f"download with download_benchmark('{name}', '{data_dir}') or CLI 'terraspectra-model download-benchmarks'"
             )
+
     raw = _load_mat_var(cube_path, spec.cube_key).astype(np.float32)  # [H, W, B]
     labels = _load_mat_var(gt_path, spec.gt_key).astype(np.int64)
     if raw.ndim != 3 or raw.shape[:2] != labels.shape:

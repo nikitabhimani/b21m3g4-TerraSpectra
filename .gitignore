@@ -1,0 +1,47 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# Large dataset files (Contract C1 rasters & .npz dumps)
+data/
+*.npz
+*.mat
+*.tif
+*.tiff
+*.cog
+*.h5
+*.he5
+*.nc
+
+# Model weights & training runs (Contract C2 artifacts)
+models/*.pt
+!models/README.md
+runs/
+*.ckpt
+*.onnx
+
+# Environment & Virtualenvs
+.venv/
+venv/
+ENV/
+.env
+.env.local
+
+# Testing & Cache
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+
+# Node / Frontend
+node_modules/
+dist/
+.pnpm-store/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini

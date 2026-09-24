@@ -21,7 +21,23 @@ import logging
 from typing import Protocol
 
 import numpy as np
-from scipy.ndimage import gaussian_filter
+
+try:
+    from scipy.ndimage import gaussian_filter
+except ImportError:
+    def gaussian_filter(input_arr: np.ndarray, sigma: float, mode: str = "wrap") -> np.ndarray:  # type: ignore[no-redef]
+        """Pure numpy fallback for gaussian_filter."""
+        radius = int(max(1, round(3.0 * sigma)))
+        x = np.arange(-radius, radius + 1)
+        kernel = np.exp(-0.5 * (x / sigma) ** 2)
+        kernel = kernel / kernel.sum()
+        pad_width = radius
+        pad_mode = mode if mode in ("wrap", "reflect", "edge") else "edge"
+        padded = np.pad(input_arr, pad_width, mode=pad_mode)
+        res = np.apply_along_axis(lambda m: np.convolve(m, kernel, mode="valid"), axis=0, arr=padded)
+        res = np.apply_along_axis(lambda m: np.convolve(m, kernel, mode="valid"), axis=1, arr=res)
+        return res[:input_arr.shape[0], :input_arr.shape[1]]
+
 from terraspectra_contracts import MAX_ONSET_DAYS, N_BANDS, WAVELENGTHS_NM, RiskClass
 
 from terraspectra_model.config import SynthConfig

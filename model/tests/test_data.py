@@ -61,6 +61,27 @@ def test_benchmark_wavelength_counts() -> None:
         benchmarks.load_benchmark("salinas", "/nonexistent")
 
 
+def test_download_benchmark(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import io
+
+    class FakeResponse(io.BytesIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+    def fake_urlopen(req, timeout=60):
+        return FakeResponse(b"MATLAB 5.0 MAT-file test dummy payload")
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+
+    cube_path, gt_path = benchmarks.download_benchmark("pavia_u", tmp_path)
+    assert cube_path.exists() and cube_path.name == "PaviaU.mat"
+    assert gt_path.exists() and gt_path.name == "PaviaU_gt.mat"
+    assert cube_path.read_bytes().startswith(b"MATLAB")
+
+
 def test_augment_keeps_alignment() -> None:
     rng = np.random.default_rng(0)
     x = np.zeros((N_BANDS, 64, 64), dtype=np.float32)
