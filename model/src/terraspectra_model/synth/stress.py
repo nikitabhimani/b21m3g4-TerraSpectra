@@ -34,8 +34,12 @@ except ImportError:
         pad_width = radius
         pad_mode = mode if mode in ("wrap", "reflect", "edge") else "edge"
         padded = np.pad(input_arr, pad_width, mode=pad_mode)
-        res = np.apply_along_axis(lambda m: np.convolve(m, kernel, mode="valid"), axis=0, arr=padded)
-        res = np.apply_along_axis(lambda m: np.convolve(m, kernel, mode="valid"), axis=1, arr=res)
+        res = np.apply_along_axis(
+            lambda m: np.convolve(m, kernel, mode="valid"), axis=0, arr=padded
+        )
+        res = np.apply_along_axis(
+            lambda m: np.convolve(m, kernel, mode="valid"), axis=1, arr=res
+        )
         return res[:input_arr.shape[0], :input_arr.shape[1]]
 
 from terraspectra_contracts import MAX_ONSET_DAYS, N_BANDS, WAVELENGTHS_NM, RiskClass
@@ -268,9 +272,38 @@ def infection_days_map(
         if fixed_days is not None:
             blob = np.where(dist <= radius, float(fixed_days), np.inf)
         else:
-            d0 = rng.integers(0, int(cfg.max_infected_days) + 1)
-            rate = rng.uniform(*cfg.days_per_pixel) / scale
-            blob = np.where(dist <= radius, np.floor(d0 + rate * np.maximum(dist, 0)), np.inf)
+            # Multi-stage biophysical epidemic progression:
+            # mature (necrotic core d=0 -> high risk halo -> pre-visual edge)
+            # developing (high risk core 1<=d<=7 -> pre-visual edge)
+            # early (pure pre-visual incubation 8<=d<=25)
+            mat = rng.choice(["mature", "developing", "early"], p=[0.45, 0.35, 0.20])
+            t = np.clip(dist / max(radius, 1e-4), 0.0, 1.0)
+            if mat == "mature":
+                t_core = rng.uniform(0.25, 0.40)
+                t_high = t_core + rng.uniform(0.25, 0.35)
+                d_val = np.where(
+                    t <= t_core,
+                    0.0,
+                    np.where(
+                        t <= t_high,
+                        1.0 + 6.0 * (t - t_core) / max(t_high - t_core, 1e-4),
+                        8.0
+                        + (cfg.max_infected_days - 8.0) * (t - t_high) / max(1.0 - t_high, 1e-4),
+                    ),
+                )
+            elif mat == "developing":
+                t_high = rng.uniform(0.35, 0.55)
+                d_val = np.where(
+                    t <= t_high,
+                    1.0 + 6.0 * t / max(t_high, 1e-4),
+                    8.0
+                    + (cfg.max_infected_days - 8.0) * (t - t_high) / max(1.0 - t_high, 1e-4),
+                )
+            else:
+                d0 = rng.uniform(cfg.early_stress_min_days + 1.0, 18.0)
+                d_val = d0 + (cfg.max_infected_days - d0) * t
+
+            blob = np.where(dist <= radius, np.floor(d_val), np.inf)
         days = np.minimum(days, blob)
     infected = np.isfinite(days) & (days <= cfg.max_infected_days)
     return np.where(infected, days, MAX_ONSET_DAYS), infected

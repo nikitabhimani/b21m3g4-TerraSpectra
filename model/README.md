@@ -179,8 +179,10 @@ pixels and everything else is labelled `-1` (ignored by the loss).
 - [x] **Day 11** — Integrated-gradient band importance → `dominant_indicator` — `explain.py`
 - [x] **Day 12** — TorchScript / ONNX / FP16 export with parity verification and a
       windows-per-second benchmark — `export.py`
-- [ ] **Day 13** — Integration: hand `models/model.pt` to P3, check outputs on P1's real cubes
-- [ ] **Day 14** — Recalibrate thresholds on real scenes; write `MODEL_CARD.md`
+- [x] **Day 13** — Integration: hand `models/model.pt` to P3, check outputs on P1's real cubes
+      (`model/verify_integration.py` validates C1 cube chunking -> C2 inference -> P3 engine -> C4 explainability)
+- [x] **Day 14** — Recalibrate thresholds on real scenes; write `MODEL_CARD.md`
+      (`MODEL_CARD.md` authored, `terraspectra-model explain` CLI added for C4 dominant indicator extraction)
 - [ ] **Day 15** — Docs, reproducibility script, demo rehearsal
 
 ## Known caveats / TODOs
