@@ -183,7 +183,8 @@ pixels and everything else is labelled `-1` (ignored by the loss).
       (`model/verify_integration.py` validates C1 cube chunking -> C2 inference -> P3 engine -> C4 explainability)
 - [x] **Day 14** — Recalibrate thresholds on real scenes; write `MODEL_CARD.md`
       (`MODEL_CARD.md` authored, `terraspectra-model explain` CLI added for C4 dominant indicator extraction)
-- [ ] **Day 15** — Docs, reproducibility script, demo rehearsal
+- [x] **Day 15** — Docs, reproducibility script, demo rehearsal
+      (`model/reproduce.py` deterministic pipeline, `model/demo.py` terminal presentation runner, and `model/REPRODUCIBILITY.md` complete guide)
 
 ## Known caveats / TODOs
 

@@ -21,6 +21,8 @@ models/*.pt
 runs/
 *.ckpt
 *.onnx
+model/reports/**/training/
+model/reports/**/*.pt
 
 # Environment & Virtualenvs
 .venv/

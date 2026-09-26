@@ -1,0 +1,34 @@
+{
+  "timestamp": "2026-09-26 15:37:47 UTC",
+  "model_path": "C:\\Users\\Acer-Nitro\\Desktop\\Infotact\\terrasectra\\b21m3g4-TerraSpectra\\models\\model.pt",
+  "inference_latency_ms": 203.55,
+  "risk_breakdown_percent": {
+    "healthy": 99.8,
+    "early_stress": 0.2,
+    "high_blight_risk": 0.0,
+    "visible_disease": 0.0
+  },
+  "forecast_lead_time_days": 18.3,
+  "dominant_indicator": "pri_decline",
+  "indicator_scores": {
+    "red_edge_shift": 0.0064,
+    "pri_decline": 0.0105,
+    "chlorophyll_loss": 0.0039,
+    "water_stress": 0.0047
+  },
+  "top_diagnostic_wavelengths": [
+    {
+      "wavelength_nm": 537.2,
+      "importance": 0.0167
+    },
+    {
+      "wavelength_nm": 568.8,
+      "importance": 0.0144
+    },
+    {
+      "wavelength_nm": 621.6,
+      "importance": 0.0132
+    }
+  ],
+  "prescribed_action": "Apply targeted bio-fungicide to North-East sector within 5 days to mitigate xanthophyll stress."
+}
