@@ -6,17 +6,18 @@ export const CONTRACT_SAMPLE_ZONES: ZoneCollection = {
   scene_id: "scn_enmap_punjab_2026",
   generated_at: "2026-09-27T12:00:00Z",
   features: [
+    // --- Punjab Agricultural Belt (Ludhiana West Farm) ---
     {
       type: "Feature",
       geometry: {
         type: "Polygon",
         coordinates: [
           [
-            [75.862313, 30.909842],
-            [75.863802, 30.909842],
-            [75.863802, 30.911120],
-            [75.862313, 30.911120],
-            [75.862313, 30.909842]
+            [75.7220, 30.8520],
+            [75.7275, 30.8520],
+            [75.7275, 30.8565],
+            [75.7220, 30.8565],
+            [75.7220, 30.8520]
           ]
         ]
       },
@@ -37,11 +38,11 @@ export const CONTRACT_SAMPLE_ZONES: ZoneCollection = {
         type: "Polygon",
         coordinates: [
           [
-            [75.854112, 30.904432],
-            [75.857419, 30.904432],
-            [75.857419, 30.907411],
-            [75.854112, 30.907411],
-            [75.854112, 30.904432]
+            [75.7140, 30.8460],
+            [75.7210, 30.8460],
+            [75.7210, 30.8510],
+            [75.7140, 30.8510],
+            [75.7140, 30.8460]
           ]
         ]
       },
@@ -62,11 +63,11 @@ export const CONTRACT_SAMPLE_ZONES: ZoneCollection = {
         type: "Polygon",
         coordinates: [
           [
-            [75.866440, 30.903264],
-            [75.868256, 30.903264],
-            [75.868256, 30.904964],
-            [75.866440, 30.904964],
-            [75.866440, 30.903264]
+            [75.7280, 30.8440],
+            [75.7320, 30.8440],
+            [75.7320, 30.8475],
+            [75.7280, 30.8475],
+            [75.7280, 30.8440]
           ]
         ]
       },
@@ -87,11 +88,11 @@ export const CONTRACT_SAMPLE_ZONES: ZoneCollection = {
         type: "Polygon",
         coordinates: [
           [
-            [75.858000, 30.912000],
-            [75.861000, 30.912000],
-            [75.861000, 30.914500],
-            [75.858000, 30.914500],
-            [75.858000, 30.912000]
+            [75.7110, 30.8520],
+            [75.7190, 30.8520],
+            [75.7190, 30.8580],
+            [75.7110, 30.8580],
+            [75.7110, 30.8520]
           ]
         ]
       },
@@ -105,6 +106,58 @@ export const CONTRACT_SAMPLE_ZONES: ZoneCollection = {
         dominant_indicator: "baseline",
         recommended_action: "Canopy is vigorous. Maintain standard irrigation and nutrition schedule."
       }
+    },
+
+    // --- Salinas Valley Agricultural Parcel ---
+    {
+      type: "Feature",
+      geometry: {
+        type: "Polygon",
+        coordinates: [
+          [
+            [-121.6580, 36.6740],
+            [-121.6520, 36.6740],
+            [-121.6520, 36.6785],
+            [-121.6580, 36.6785],
+            [-121.6580, 36.6740]
+          ]
+        ]
+      },
+      properties: {
+        zone_id: "salinas-red-01",
+        risk_class: 2,
+        risk_class_name: "high_blight_risk",
+        risk_score: 0.94,
+        area_acres: 8.4,
+        days_to_onset: 16.0,
+        dominant_indicator: "red_edge_shift",
+        recommended_action: "Apply systemic strobilurin fungicide within 48h to prevent downy mildew outbreak."
+      }
+    },
+    {
+      type: "Feature",
+      geometry: {
+        type: "Polygon",
+        coordinates: [
+          [
+            [-121.6640, 36.6710],
+            [-121.6590, 36.6710],
+            [-121.6590, 36.6760],
+            [-121.6640, 36.6760],
+            [-121.6640, 36.6710]
+          ]
+        ]
+      },
+      properties: {
+        zone_id: "salinas-amber-02",
+        risk_class: 1,
+        risk_class_name: "early_stress",
+        risk_score: 0.72,
+        area_acres: 15.2,
+        days_to_onset: 22.0,
+        dominant_indicator: "pri_decline",
+        recommended_action: "Monitor micro-climate humidity; deploy bio-stimulant copper spray."
+      }
     }
   ]
 };
@@ -112,33 +165,33 @@ export const CONTRACT_SAMPLE_ZONES: ZoneCollection = {
 export const SAMPLE_FIELDS: FieldItem[] = [
   {
     id: "fld_punjab_corn_01",
-    name: "Ludhiana Sector A — Hybrid Maize",
+    name: "Ludhiana Ag Belt — Hybrid Maize",
     crop_type: "Maize (Corn)",
     total_acres: 1000.0,
-    center: [75.8600, 30.9080],
+    center: [75.7220, 30.8520],
     boundary: [
       [
-        [75.8500, 30.9000],
-        [75.8720, 30.9000],
-        [75.8720, 30.9160],
-        [75.8500, 30.9160],
-        [75.8500, 30.9000]
+        [75.7050, 30.8400],
+        [75.7400, 30.8400],
+        [75.7400, 30.8650],
+        [75.7050, 30.8650],
+        [75.7050, 30.8400]
       ]
     ]
   },
   {
     id: "fld_salinas_veg_02",
-    name: "Salinas Valley Test Farm — Lettuce/Broccoli",
+    name: "Salinas Valley Benchmark — Lettuce/Broccoli",
     crop_type: "Vegetable Crops",
     total_acres: 450.0,
     center: [-121.6555, 36.6777],
     boundary: [
       [
-        [-121.6650, 36.6700],
-        [-121.6450, 36.6700],
-        [-121.6450, 36.6850],
-        [-121.6650, 36.6850],
-        [-121.6650, 36.6700]
+        [-121.6680, 36.6680],
+        [-121.6420, 36.6680],
+        [-121.6420, 36.6860],
+        [-121.6680, 36.6860],
+        [-121.6680, 36.6680]
       ]
     ]
   }
@@ -147,7 +200,7 @@ export const SAMPLE_FIELDS: FieldItem[] = [
 export const SAMPLE_SCENES: SceneItem[] = [
   {
     scene_id: "scn_enmap_punjab_2026",
-    name: "EnMAP L2A — 200 Canonical Bands (Punjab)",
+    name: "EnMAP L2A — 200 Canonical Bands (Punjab Ag Belt)",
     satellite: "EnMAP",
     bands: 200,
     acquisition_date: "2026-09-25",
@@ -167,7 +220,7 @@ export const SAMPLE_SCENES: SceneItem[] = [
   },
   {
     scene_id: "scn_hyperion_indiana_benchmark",
-    name: "NASA EO-1 Hyperion Benchmark (Indian Pines)",
+    name: "NASA EO-1 Hyperion Benchmark (Salinas Valley)",
     satellite: "Hyperion",
     bands: 200,
     acquisition_date: "2026-09-18",
@@ -198,42 +251,38 @@ export const SAMPLE_JOB: JobItem = {
   }
 };
 
-// Generate realistic 200-band spectral profile (400 nm to 2500 nm)
 export const SAMPLE_SPECTRAL_PROFILE: SpectralPoint[] = (() => {
   const points: SpectralPoint[] = [];
   const startWl = 400;
   const endWl = 2500;
-  const steps = 60; // 60 sample points for high fidelity SVG rendering
+  const steps = 60;
   const stepSize = (endWl - startWl) / steps;
 
   for (let i = 0; i <= steps; i++) {
     const wl = Math.round(startWl + i * stepSize);
     
-    // Healthy canopy: low in blue/red, green peak at 550, red edge jump at 680-750, high NIR, water troughs at 1450, 1940
     let healthy = 0.05;
     if (wl < 500) healthy = 0.04;
-    else if (wl < 600) healthy = 0.08 + 0.04 * Math.sin(((wl - 500) / 100) * Math.PI); // Green bump
-    else if (wl < 680) healthy = 0.04; // Chlorophyll absorption
-    else if (wl < 760) healthy = 0.05 + 0.45 * ((wl - 680) / 80); // Red edge steep rise
-    else if (wl < 1300) healthy = 0.50 - 0.05 * ((wl - 760) / 540); // NIR plateau
-    else if (wl < 1450) healthy = 0.45 - 0.25 * ((wl - 1300) / 150); // Water dip 1
+    else if (wl < 600) healthy = 0.08 + 0.04 * Math.sin(((wl - 500) / 100) * Math.PI);
+    else if (wl < 680) healthy = 0.04;
+    else if (wl < 760) healthy = 0.05 + 0.45 * ((wl - 680) / 80);
+    else if (wl < 1300) healthy = 0.50 - 0.05 * ((wl - 760) / 540);
+    else if (wl < 1450) healthy = 0.45 - 0.25 * ((wl - 1300) / 150);
     else if (wl < 1800) healthy = 0.35 + 0.05 * Math.sin(((wl - 1450) / 350) * Math.PI);
-    else if (wl < 2000) healthy = 0.15; // Water dip 2
+    else if (wl < 2000) healthy = 0.15;
     else healthy = 0.22 - 0.10 * ((wl - 2000) / 500);
 
-    // Stressed canopy: Red edge shifts left (blue shift), lower NIR plateau, higher visible red reflectance
     let stressed = healthy;
     if (wl >= 520 && wl <= 580) {
-      stressed = healthy - 0.025; // Photochemical Reflectance Index (PRI) drop
+      stressed = healthy - 0.025;
     } else if (wl >= 650 && wl <= 710) {
-      stressed = healthy + 0.05; // Chlorophyll breakdown causes visible red leak
+      stressed = healthy + 0.05;
     } else if (wl > 710 && wl <= 1100) {
-      stressed = healthy * 0.72; // Cellular structure collapse lowers NIR
+      stressed = healthy * 0.72;
     } else if (wl > 1100 && wl <= 1800) {
-      stressed = healthy * 1.15; // Water loss increases SWIR reflectance
+      stressed = healthy * 1.15;
     }
 
-    // Integrated Gradients band importance peak at key diagnostic bands (537nm, 705nm, 970nm)
     let importance = 0.002;
     if (Math.abs(wl - 537) < 30) importance = 0.015 * (1 - Math.abs(wl - 537) / 30);
     else if (Math.abs(wl - 705) < 35) importance = 0.018 * (1 - Math.abs(wl - 705) / 35);

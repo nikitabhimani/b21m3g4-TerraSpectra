@@ -10,6 +10,7 @@ import {
   Scan, 
   Sliders, 
   SunMedium, 
+  Wheat, 
   Zap 
 } from 'lucide-react';
 import { FieldItem, ZoneCollection, ZoneFeature } from '../../types';
@@ -17,6 +18,8 @@ import { FieldItem, ZoneCollection, ZoneFeature } from '../../types';
 interface SatelliteMapProps {
   zones: ZoneCollection;
   activeField: FieldItem;
+  fields: FieldItem[];
+  onFieldChange: (fieldId: string) => void;
   selectedZone: ZoneFeature | null;
   onSelectZone: (zone: ZoneFeature) => void;
   daysHorizon: number;
@@ -25,6 +28,8 @@ interface SatelliteMapProps {
 export const SatelliteMap: React.FC<SatelliteMapProps> = ({
   zones,
   activeField,
+  fields,
+  onFieldChange,
   selectedZone,
   onSelectZone,
   daysHorizon,
@@ -46,10 +51,17 @@ export const SatelliteMap: React.FC<SatelliteMapProps> = ({
 
   const features = zones.features || [];
 
-  // Filter features based on daysHorizon
-  const visibleFeatures = features.filter(
-    (f) => f.properties.risk_class === 0 || f.properties.days_to_onset >= (30 - daysHorizon)
-  );
+  // Filter features based on daysHorizon and field boundary intersection
+  const visibleFeatures = features.filter((f) => {
+    const p = f.properties;
+    const ring = f.geometry.coordinates[0];
+    const isInsideField =
+      Math.abs(ring[0][0] - activeField.center[0]) < 0.25 &&
+      Math.abs(ring[0][1] - activeField.center[1]) < 0.25;
+
+    if (!isInsideField) return false;
+    return p.risk_class === 0 || p.days_to_onset >= (30 - daysHorizon);
+  });
 
   const getRiskColor = (riskClass: number) => {
     switch (riskClass) {
@@ -78,10 +90,8 @@ export const SatelliteMap: React.FC<SatelliteMapProps> = ({
         attributionControl: true,
       });
 
-      // Add Zoom Control at bottom right
       L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-      // Layer groups
       const zonesGroup = L.layerGroup().addTo(map);
       const heatmapGroup = L.layerGroup().addTo(map);
       const droneGroup = L.layerGroup().addTo(map);
@@ -121,15 +131,12 @@ export const SatelliteMap: React.FC<SatelliteMapProps> = ({
     let attribution = '';
 
     if (basemapMode === 'satellite') {
-      // High-resolution ESRI World Imagery
       url = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
       attribution = '&copy; Esri &bull; Earthstar Geographics &bull; TerraSpectra';
     } else if (basemapMode === 'dark') {
-      // CartoDB Dark Matter
       url = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
       attribution = '&copy; OpenStreetMap contributors &copy; CARTO';
     } else {
-      // OpenTopoMap
       url = 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png';
       attribution = '&copy; OpenStreetMap contributors &bull; OpenTopoMap';
     }
@@ -147,7 +154,7 @@ export const SatelliteMap: React.FC<SatelliteMapProps> = ({
     const map = mapInstanceRef.current;
     if (!map) return;
     map.flyTo([activeField.center[1], activeField.center[0]], 15, {
-      duration: 1.5,
+      duration: 1.2,
     });
   }, [activeField]);
 
@@ -166,12 +173,11 @@ export const SatelliteMap: React.FC<SatelliteMapProps> = ({
       weight: 2,
       dashArray: '6, 6',
       fillColor: '#064e3b',
-      fillOpacity: 0.1,
+      fillOpacity: 0.12,
     })
       .bindTooltip(`<b>${activeField.name}</b><br/>${activeField.crop_type} (${activeField.total_acres} ac)`, {
         permanent: false,
         direction: 'center',
-        className: 'leaflet-tactical-tooltip',
       })
       .addTo(zonesLayerGroupRef.current);
 
@@ -181,21 +187,19 @@ export const SatelliteMap: React.FC<SatelliteMapProps> = ({
       const isSelected = selectedZone?.properties.zone_id === p.zone_id;
       const colors = getRiskColor(p.risk_class);
 
-      // GeoJSON polygon coordinates are [lng, lat] -> Leaflet requires [lat, lng]
       const latLngs = f.geometry.coordinates[0].map(([lng, lat]) => [lat, lng] as [number, number]);
 
       const poly = L.polygon(latLngs, {
         color: isSelected ? '#ffffff' : colors.border,
         weight: isSelected ? 3.5 : 2,
         fillColor: colors.fill,
-        fillOpacity: isSelected ? 0.75 : p.risk_class === 0 ? 0.25 : 0.55,
+        fillOpacity: isSelected ? 0.8 : p.risk_class === 0 ? 0.3 : 0.65,
       });
 
       poly.on('click', () => {
         onSelectZone(f);
       });
 
-      // Rich hover popup
       poly.bindTooltip(
         `
         <div style="font-family: inherit; font-size: 11px; line-height: 1.4; padding: 2px;">
@@ -223,10 +227,10 @@ export const SatelliteMap: React.FC<SatelliteMapProps> = ({
       if (showHeatmap && p.risk_class > 0) {
         const center = latLngs[0];
         const circle = L.circle(center, {
-          radius: Math.max(40, p.area_acres * 12),
+          radius: Math.max(50, p.area_acres * 14),
           color: colors.fill,
           fillColor: colors.fill,
-          fillOpacity: heatmapOpacity * 0.45,
+          fillOpacity: heatmapOpacity * 0.5,
           weight: 0,
         });
         circle.addTo(heatmapLayerGroupRef.current!);
@@ -243,23 +247,20 @@ export const SatelliteMap: React.FC<SatelliteMapProps> = ({
 
     if (!showDronePath) return;
 
-    // Connect risk zones with autonomous spray mission path
     const riskZones = visibleFeatures.filter((f) => f.properties.risk_class >= 1);
     if (riskZones.length === 0) return;
 
     const waypoints: [number, number][] = riskZones.map((f) => {
       const ring = f.geometry.coordinates[0];
-      return [ring[0][1], ring[0][0]]; // [lat, lng]
+      return [ring[0][1], ring[0][0]];
     });
 
-    // Add home base
     const homeBase: [number, number] = [
       activeField.boundary[0][0][1],
       activeField.boundary[0][0][0],
     ];
     const fullPath = [homeBase, ...waypoints, homeBase];
 
-    // Flightpath Polyline
     L.polyline(fullPath, {
       color: '#06b6d4',
       weight: 2.5,
@@ -267,7 +268,6 @@ export const SatelliteMap: React.FC<SatelliteMapProps> = ({
       opacity: 0.85,
     }).addTo(droneLayerGroupRef.current);
 
-    // Waypoint markers
     waypoints.forEach((pt, i) => {
       L.circleMarker(pt, {
         radius: 6,
@@ -276,7 +276,7 @@ export const SatelliteMap: React.FC<SatelliteMapProps> = ({
         fillOpacity: 0.9,
         weight: 2,
       })
-        .bindTooltip(`<b>WP-0${i + 1}</b><br/>Bio-Fungicide VRA Injection Zone`, {
+        .bindTooltip(`<b>WP-0${i + 1}</b><br/>Targeted VRA Bio-Fungicide Injection`, {
           permanent: false,
         })
         .addTo(droneLayerGroupRef.current!);
@@ -286,19 +286,35 @@ export const SatelliteMap: React.FC<SatelliteMapProps> = ({
   return (
     <div className="relative w-full h-full bg-slate-950 overflow-hidden flex flex-col select-none">
       {/* Top Aerospace Telemetry Ticker (Tactical HUD) */}
-      <div className="absolute top-3 left-4 right-4 z-20 flex items-center justify-between pointer-events-none">
-        {/* Mission Ticker */}
-        <div className="bg-slate-950/85 backdrop-blur-md border border-slate-800/90 px-3.5 py-1.5 rounded-xl shadow-xl flex items-center gap-3 text-slate-300 font-mono text-[11px] pointer-events-auto">
+      <div className="absolute top-3 left-4 right-4 z-20 flex items-center justify-between pointer-events-none gap-3">
+        {/* Left: Farm Field Selector */}
+        <div className="bg-slate-950/90 backdrop-blur-md border border-slate-800/90 px-3 py-1.5 rounded-xl shadow-xl flex items-center gap-2 pointer-events-auto">
+          <Wheat className="w-4 h-4 text-emerald-400" />
+          <select
+            value={activeField.id}
+            onChange={(e) => onFieldChange(e.target.value)}
+            className="bg-transparent text-xs font-semibold text-white focus:outline-none cursor-pointer pr-1"
+          >
+            {fields.map((f) => (
+              <option key={f.id} value={f.id} className="bg-slate-900 text-slate-200">
+                {f.name} ({f.crop_type})
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Center: Mission Ticker */}
+        <div className="hidden xl:flex items-center gap-3 bg-slate-950/90 backdrop-blur-md border border-slate-800/90 px-3.5 py-1.5 rounded-xl shadow-xl text-slate-300 font-mono text-[11px] pointer-events-auto">
           <div className="flex items-center gap-1.5 text-emerald-400 font-semibold">
             <Radio className="w-3.5 h-3.5 animate-pulse text-emerald-400" />
             <span>SAT: ENMAP-L2A</span>
           </div>
           <span className="text-slate-600">|</span>
-          <span className="hidden md:inline text-slate-400">
-            SUN-EL: <span className="text-white font-medium">54.2&deg;</span>
+          <span className="text-slate-400">
+            SUN-EL: <span className="text-white font-medium">54.2°</span>
           </span>
-          <span className="hidden md:inline text-slate-600">|</span>
-          <span className="hidden sm:inline text-slate-400">
+          <span className="text-slate-600">|</span>
+          <span className="text-slate-400">
             BANDS: <span className="text-emerald-400 font-semibold">200 [400–2500nm]</span>
           </span>
           <span className="text-slate-600">|</span>
@@ -310,7 +326,7 @@ export const SatelliteMap: React.FC<SatelliteMapProps> = ({
         {/* Right Tactical Map Controls */}
         <div className="flex items-center gap-2 pointer-events-auto">
           {/* Spectral Filter / Vigor Layer */}
-          <div className="bg-slate-950/85 backdrop-blur-md border border-slate-800/90 rounded-xl p-1 shadow-xl flex items-center text-xs">
+          <div className="bg-slate-950/90 backdrop-blur-md border border-slate-800/90 rounded-xl p-1 shadow-xl flex items-center text-xs">
             <button
               onClick={() => setSpectralFilter('true_color')}
               className={`px-2.5 py-1 rounded-lg font-medium transition-all ${
@@ -346,7 +362,7 @@ export const SatelliteMap: React.FC<SatelliteMapProps> = ({
           </div>
 
           {/* Basemap Switcher */}
-          <div className="bg-slate-950/85 backdrop-blur-md border border-slate-800/90 rounded-xl p-1 shadow-xl flex items-center text-xs">
+          <div className="bg-slate-950/90 backdrop-blur-md border border-slate-800/90 rounded-xl p-1 shadow-xl flex items-center text-xs">
             <button
               onClick={() => setBasemapMode('satellite')}
               className={`px-2.5 py-1 rounded-lg font-medium transition-all ${
@@ -400,7 +416,7 @@ export const SatelliteMap: React.FC<SatelliteMapProps> = ({
         </div>
       )}
 
-      {/* Floating Tactical Overlay Controls (Top Left below ticker) */}
+      {/* Floating Tactical Overlay Controls (Cleanly positioned on left without overlap) */}
       <div className="absolute top-16 left-4 z-20 flex flex-col gap-2">
         {/* Heatmap Layer Toggle */}
         <div className="flex items-center gap-2 bg-slate-950/85 backdrop-blur-md border border-slate-800 px-3 py-1.5 rounded-xl shadow-lg text-xs">
@@ -460,8 +476,8 @@ export const SatelliteMap: React.FC<SatelliteMapProps> = ({
           <Crosshair className="w-3.5 h-3.5 text-emerald-400" />
           <span>
             {cursorCoords
-              ? `${cursorCoords.lat}&deg;N, ${cursorCoords.lng}&deg;E`
-              : `${activeField.center[1].toFixed(4)}&deg;N, ${activeField.center[0].toFixed(4)}&deg;E`}
+              ? `${cursorCoords.lat}°N, ${cursorCoords.lng}°E`
+              : `${activeField.center[1].toFixed(4)}°N, ${activeField.center[0].toFixed(4)}°E`}
           </span>
         </div>
         <span className="text-slate-700">|</span>

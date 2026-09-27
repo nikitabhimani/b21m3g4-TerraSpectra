@@ -44,7 +44,7 @@ export const App: React.FC = () => {
     async function init() {
       const health = await ApiService.checkHealth();
       setApiStatus(health.status);
-      if (health.status.includes('healthy')) {
+      if (health.status === 'ok' || health.status.includes('healthy')) {
         setIsDemoMode(false);
       }
       const loadedFields = await ApiService.getFields();
@@ -86,6 +86,14 @@ export const App: React.FC = () => {
     const found = fields.find((f) => f.id === fieldId);
     if (found) {
       setActiveField(found);
+      // Select appropriate zone for that field
+      const fieldZones = zones.features.filter((f) => {
+        const ring = f.geometry.coordinates[0];
+        return Math.abs(ring[0][0] - found.center[0]) < 0.25;
+      });
+      if (fieldZones.length > 0) {
+        setSelectedZone(fieldZones[0]);
+      }
     }
   };
 
@@ -114,28 +122,12 @@ export const App: React.FC = () => {
       <div className="flex-1 flex overflow-hidden">
         {/* Left Map View Area (65%) */}
         <div className="flex-1 relative flex flex-col h-full bg-slate-950">
-          {/* Farm Switcher Floating Bar */}
-          <div className="absolute top-16 left-4 z-20 flex items-center gap-2">
-            <div className="flex items-center gap-2 bg-slate-950/90 backdrop-blur-md border border-slate-800/90 px-3 py-1.5 rounded-xl shadow-2xl">
-              <Wheat className="w-4 h-4 text-emerald-400" />
-              <select
-                value={activeField.id}
-                onChange={(e) => handleFieldChange(e.target.value)}
-                className="bg-transparent text-xs font-semibold text-white focus:outline-none cursor-pointer"
-              >
-                {fields.map((f) => (
-                  <option key={f.id} value={f.id} className="bg-slate-900 text-slate-200">
-                    {f.name} ({f.crop_type})
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Real High-Resolution Satellite Map */}
+          {/* Real High-Resolution Satellite Map (with integrated Field Selector) */}
           <SatelliteMap
             zones={zones}
             activeField={activeField}
+            fields={fields}
+            onFieldChange={handleFieldChange}
             selectedZone={selectedZone}
             onSelectZone={(z) => setSelectedZone(z)}
             daysHorizon={daysHorizon}
