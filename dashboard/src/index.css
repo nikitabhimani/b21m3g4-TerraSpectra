@@ -1,3 +1,5 @@
+@import "leaflet/dist/leaflet.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -11,16 +13,69 @@
 
 /* Custom scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.6);
+  background: rgba(10, 15, 30, 0.8);
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(51, 65, 85, 0.7);
-  border-radius: 3px;
+  background: rgba(30, 41, 59, 0.9);
+  border-radius: 2px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(71, 85, 105, 0.9);
+  background: rgba(16, 185, 129, 0.6);
+}
+
+/* Radar scanning beam keyframes */
+@keyframes radar-sweep {
+  0% {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.8;
+  }
+  80% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(1000%);
+    opacity: 0;
+  }
+}
+
+.animate-radar-sweep {
+  animation: radar-sweep 5s ease-in-out infinite;
+}
+
+/* Leaflet map container styling */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  background: #050b14 !important;
+  font-family: inherit;
+}
+
+.leaflet-bar a {
+  background-color: rgba(15, 23, 42, 0.85) !important;
+  border-color: rgba(51, 65, 85, 0.7) !important;
+  color: #94a3b8 !important;
+  backdrop-filter: blur(8px);
+}
+
+.leaflet-bar a:hover {
+  background-color: rgba(30, 41, 59, 0.9) !important;
+  color: #10b981 !important;
+}
+
+.leaflet-control-attribution {
+  background: rgba(15, 23, 42, 0.8) !important;
+  color: #64748b !important;
+  font-size: 9px !important;
+  backdrop-filter: blur(4px);
+}
+
+.leaflet-control-attribution a {
+  color: #94a3b8 !important;
 }
