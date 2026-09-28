@@ -43,6 +43,11 @@ node_modules/
 dist/
 .pnpm-store/
 
+# Local databases
+*.db
+*.db-shm
+*.db-wal
+
 # OS files
 .DS_Store
 Thumbs.db
