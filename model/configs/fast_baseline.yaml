@@ -1,0 +1,66 @@
+# Fast CPU baseline training configuration for Day 8
+# Trained on synthetic dataset (data/synth/train.npz and val.npz)
+data:
+  source: npz
+  npz_paths: [../data/synth/train.npz, ../data/synth/val.npz]
+  window_size: 64
+  batch_size: 16
+  num_workers: 0
+  seed: 42
+  augment:
+    enabled: true
+    hflip_p: 0.5
+    vflip_p: 0.5
+    rot90: true
+    spectral_scale: [0.95, 1.05]
+    spectral_jitter_std: 0.003
+    band_dropout_p: 0.1
+    band_dropout_max_bands: 5
+
+model:
+  variant: hybrid
+  cnn_channels: [8, 16, 32]
+  cnn_spectral_kernels: [7, 5, 3]
+  cnn_spectral_strides: [4, 2, 2]
+  cnn_out_channels: 48
+  patch_size: 8
+  embed_dim: 96
+  depth: 3
+  num_heads: 4
+  mlp_ratio: 2.0
+  dropout: 0.05
+  attn_dropout: 0.0
+  pos_embed: learned
+  spectral_tokens: true
+  spectral_groups: 10
+  decoder_channels: 32
+
+train:
+  max_epochs: 10
+  lr: 5.0e-4
+  weight_decay: 0.01
+  warmup_fraction: 0.05
+  min_lr_ratio: 0.01
+  precision: 32-true
+  accelerator: cpu
+  devices: 1
+  gradient_clip_val: 1.0
+  accumulate_grad_batches: 1
+  focal_gamma: 2.0
+  class_weights: [0.5, 1.5, 1.5, 1.0]
+  ignore_index: -1
+  onset_weight: 0.1
+  huber_delta: 2.0
+  monitor: val/macro_f1
+  early_stopping_patience: 5
+  output_dir: runs/baseline
+  seed: 42
+  log_every_n_steps: 5
+  mlflow: false
+
+export:
+  output_path: ../models/model.pt
+  fp16: false
+  onnx: false
+  parity_atol: 1.0e-4
+  temperature: 1.0

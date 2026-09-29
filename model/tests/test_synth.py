@@ -59,6 +59,12 @@ def test_generate_dataset_shapes() -> None:
     assert d["y"].dtype == np.int64 and d["mask"].dtype == bool
 
 
+def test_multistage_epidemic_progression_covers_all_classes() -> None:
+    d = generate_dataset(15, seed=42, cfg=SynthConfig(patch_infected_p=1.0, max_blobs=3))
+    classes_present = set(np.unique(d["y"]))
+    assert classes_present == {0, 1, 2, 3}, f"Expected all 4 classes, got {classes_present}"
+
+
 def test_blend_stress_into_real_pixels() -> None:
     cube, _ = make_synthetic_cube(64, 64, seed=0)
     cube = np.clip(cube, 0, 1)

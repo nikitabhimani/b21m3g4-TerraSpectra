@@ -21,6 +21,8 @@ models/*.pt
 runs/
 *.ckpt
 *.onnx
+model/reports/**/training/
+model/reports/**/*.pt
 
 # Environment & Virtualenvs
 .venv/
@@ -40,6 +42,11 @@ htmlcov/
 node_modules/
 dist/
 .pnpm-store/
+
+# Local databases
+*.db
+*.db-shm
+*.db-wal
 
 # OS files
 .DS_Store

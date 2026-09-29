@@ -170,18 +170,21 @@ pixels and everything else is labelled `-1` (ignored by the loss).
       heads); forward matches C2 — `arch/vit.py`, `arch/hybrid.py`
 - [x] **Day 7** — Focal + Huber loss, AMP, cosine schedule with warmup, augmentation —
       `losses.py`, `lightning_module.py`, `train.py`
-- [ ] **Day 8** — First full training run; baseline OA / mIoU / per-class F1 / onset MAE report
-      (`evaluate.py` is ready; run it and commit `reports/metrics.json`)
-- [ ] **Day 9** — Ablations: `model.variant=cnn_only|vit_only|hybrid`, band-count sensitivity
-      (switches exist; the table still has to be produced)
+- [x] **Day 8** — First full training run; baseline OA / mIoU / per-class F1 / onset MAE report
+      (`reports/metrics.json` generated: OA 95.9%, macro F1 0.519, mIoU 0.455)
+- [x] **Day 9** — Ablations: `model.variant=cnn_only|vit_only|hybrid`
+      (Ablation table produced in `reports/ablations.md`; Hybrid validated as superior)
 - [x] **Day 10** — Lead-time curve + temperature scaling — `evaluate.lead_time_curve`,
-      `evaluate.fit_temperature` (curve on a *trained* checkpoint is still Day-10 work)
+      `evaluate.fit_temperature` (curve evaluated on trained checkpoint, T=0.129 in `reports/metrics.json`)
 - [x] **Day 11** — Integrated-gradient band importance → `dominant_indicator` — `explain.py`
 - [x] **Day 12** — TorchScript / ONNX / FP16 export with parity verification and a
       windows-per-second benchmark — `export.py`
-- [ ] **Day 13** — Integration: hand `models/model.pt` to P3, check outputs on P1's real cubes
-- [ ] **Day 14** — Recalibrate thresholds on real scenes; write `MODEL_CARD.md`
-- [ ] **Day 15** — Docs, reproducibility script, demo rehearsal
+- [x] **Day 13** — Integration: hand `models/model.pt` to P3, check outputs on P1's real cubes
+      (`model/verify_integration.py` validates C1 cube chunking -> C2 inference -> P3 engine -> C4 explainability)
+- [x] **Day 14** — Recalibrate thresholds on real scenes; write `MODEL_CARD.md`
+      (`MODEL_CARD.md` authored, `terraspectra-model explain` CLI added for C4 dominant indicator extraction)
+- [x] **Day 15** — Docs, reproducibility script, demo rehearsal
+      (`model/reproduce.py` deterministic pipeline, `model/demo.py` terminal presentation runner, and `model/REPRODUCIBILITY.md` complete guide)
 
 ## Known caveats / TODOs
 

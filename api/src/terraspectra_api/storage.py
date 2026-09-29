@@ -8,6 +8,7 @@ import tempfile
 from pathlib import Path
 from typing import BinaryIO, Protocol
 from urllib.parse import unquote, urlparse
+from urllib.request import url2pathname
 
 CHUNK = 8 * 1024 * 1024
 
@@ -84,7 +85,10 @@ class LocalStorage:
         """Map a ``file://`` URI (or bare path) to a local path inside the allowed roots."""
         parsed = urlparse(uri)
         if parsed.scheme in ("", "file"):
-            raw = unquote(parsed.path if parsed.scheme else uri)
+            if parsed.scheme == "file":
+                raw = url2pathname(unquote(parsed.path))
+            else:
+                raw = unquote(uri)
             path = Path(raw).resolve()
             if not any(path.is_relative_to(root) for root in self.allowed_roots):
                 raise UnsupportedUriError("URI points outside the allowed storage roots")

@@ -1,0 +1,39 @@
+{
+  "status": "PASSED",
+  "timestamp": "2026-09-26 15:35:26 UTC",
+  "quick_mode": true,
+  "seed": 42,
+  "config_used": "tiny.yaml",
+  "environment": {
+    "os": "Windows-10-10.0.26200-SP0",
+    "python": "3.11.9",
+    "torch": "2.14.0+cpu",
+    "cuda_available": false
+  },
+  "training": {
+    "max_epochs": 1,
+    "duration_seconds": 1.63,
+    "best_checkpoint": "C:\\Users\\Acer-Nitro\\Desktop\\Infotact\\terrasectra\\b21m3g4-TerraSpectra\\model\\reports\\reproducibility\\training\\checkpoints\\epoch000-step2-v1.ckpt"
+  },
+  "evaluation_metrics": {
+    "overall_accuracy": 0.035,
+    "macro_f1": 0.0169,
+    "miou": 0.0088,
+    "per_class_f1": {
+      "healthy": 0.0,
+      "early_stress": 0.0677,
+      "high_blight_risk": 0.0,
+      "visible_disease": 0.0
+    },
+    "onset_mae_days": 8.36
+  },
+  "contract_c2_verification": {
+    "torchscript_path": "reports\\reproducibility\\reproduced_model.pt",
+    "artifact_size_mb": 0.81,
+    "numerical_parity_passed": true,
+    "probs_max_abs_diff": 0.0,
+    "onset_max_abs_diff": 0.0,
+    "contract_c2_passed": true
+  },
+  "total_elapsed_seconds": 2.56
+}
