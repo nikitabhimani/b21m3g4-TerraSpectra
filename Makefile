@@ -31,6 +31,9 @@ stub-model: ## Write contract stub model to models/model.pt
 sample-cube: ## Write a synthetic C1 cube to data/synthetic_cube.tif
 	mkdir -p data && cd contracts/python && uv run python ../fixtures/synthetic_cube.py ../../data/synthetic_cube.tif --size 512
 
+verify-e2e: ## Run cross-track end-to-end integration verification
+	uv run --project api python scripts/verify_e2e.py
+
 up: ## Start the full stack (CPU)
 	docker compose up --build
 
