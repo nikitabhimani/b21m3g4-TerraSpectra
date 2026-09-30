@@ -223,6 +223,9 @@ export const App: React.FC = () => {
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}
         zones={zones}
+        fieldName={activeField.name}
+        cropType={activeField.crop_type}
+        totalAcres={activeField.total_acres}
       />
     </div>
   );
