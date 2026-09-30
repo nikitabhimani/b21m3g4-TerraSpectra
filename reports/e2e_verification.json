@@ -1,0 +1,83 @@
+{
+  "timestamp": "2026-09-29T11:22:47.840477+00:00",
+  "platform": "win32",
+  "python_version": "3.11.9",
+  "torch_version": "2.14.0+cpu",
+  "steps": {
+    "step1_pipeline": {
+      "status": "PASSED",
+      "duration_s": 1.215,
+      "cube_size_mb": 2.76,
+      "dimensions": [
+        128,
+        128,
+        200
+      ],
+      "c1_violations": [],
+      "indices": {
+        "healthy_ndvi": 0.836,
+        "stressed_ndvi": 0.773,
+        "healthy_rep_nm": 728.8,
+        "stressed_rep_nm": 726.6
+      }
+    },
+    "step2_model": {
+      "status": "PASSED",
+      "duration_s": 0.672,
+      "model_size_mb": 3.02,
+      "latency_ms": 109.73,
+      "output_shapes": {
+        "probs": [
+          1,
+          4,
+          64,
+          64
+        ],
+        "onset": [
+          1,
+          1,
+          64,
+          64
+        ]
+      }
+    },
+    "step3_api": {
+      "status": "PASSED",
+      "duration_s": 1.531,
+      "scene_id": "scn_fc81dd41a522404d",
+      "job_id": "job_a15b8646f7ca42c0",
+      "summary": {
+        "acres_analyzed": 3642.828,
+        "acres_at_risk": 193.039,
+        "zones_by_class": {
+          "healthy": 0,
+          "early_stress": 1,
+          "high_blight_risk": 0,
+          "visible_disease": 0
+        }
+      },
+      "zones_count": 1,
+      "tile_bytes": 6483
+    },
+    "step4_dashboard": {
+      "status": "PASSED",
+      "duration_s": 0.0,
+      "zone_details": [
+        {
+          "zone_id": "z-001",
+          "class": "early_stress",
+          "score": 0.9209,
+          "acres": 193.04,
+          "onset_days": 5.4,
+          "indicator": "chlorophyll_loss",
+          "action": "Scout zone within 3 days and increase monitoring frequency"
+        }
+      ],
+      "total_risk_acres": 193.04,
+      "average_lead_time_days": 5.4,
+      "estimated_savings_usd": 105592.88
+    }
+  },
+  "overall_status": "PASSED",
+  "total_duration_s": 3.42
+}
