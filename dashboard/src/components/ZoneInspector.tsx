@@ -18,11 +18,13 @@ import { ZoneFeature, ZoneProperties } from '../types';
 interface ZoneInspectorProps {
   selectedZone: ZoneFeature | null;
   onClearSelection: () => void;
+  onOpenMatrix?: () => void;
 }
 
 export const ZoneInspector: React.FC<ZoneInspectorProps> = ({
   selectedZone,
   onClearSelection,
+  onOpenMatrix,
 }) => {
   if (!selectedZone) {
     return (
@@ -30,8 +32,16 @@ export const ZoneInspector: React.FC<ZoneInspectorProps> = ({
         <Crosshair className="w-10 h-10 mb-3 stroke-[1.5] text-slate-600 animate-pulse" />
         <h3 className="text-sm font-semibold text-slate-300">No Zone Selected</h3>
         <p className="text-xs mt-1 max-w-[220px] text-slate-400">
-          Click any polygon zone or heatmap anomaly on the map to inspect pre-visual risk attribution.
+          Click any polygon zone or heatmap anomaly on the map, or select from the zone matrix to inspect pre-visual risk attribution.
         </p>
+        {onOpenMatrix && (
+          <button
+            onClick={onOpenMatrix}
+            className="mt-4 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 transition-colors"
+          >
+            Browse Zone Matrix
+          </button>
+        )}
       </div>
     );
   }

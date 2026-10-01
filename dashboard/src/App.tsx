@@ -21,6 +21,7 @@ import { ForecastSlider } from './components/ForecastSlider';
 import { RoiCalculator } from './components/Economics/RoiCalculator';
 import { JobModal } from './components/JobModal';
 import { ExportModal } from './components/ExportModal';
+import { ZoneTable } from './components/ZoneTable';
 import { ApiService } from './services/api';
 import { FieldItem, SceneItem, ZoneCollection, ZoneFeature } from './types';
 import { CONTRACT_SAMPLE_ZONES, SAMPLE_FIELDS, SAMPLE_SCENES } from './fixtures/mockData';
@@ -35,7 +36,7 @@ export const App: React.FC = () => {
   const [zones, setZones] = useState<ZoneCollection>(CONTRACT_SAMPLE_ZONES);
   const [selectedZone, setSelectedZone] = useState<ZoneFeature | null>(null);
   const [daysHorizon, setDaysHorizon] = useState<number>(30);
-  const [sidebarTab, setSidebarTab] = useState<'inspector' | 'economics'>('inspector');
+  const [sidebarTab, setSidebarTab] = useState<'matrix' | 'inspector' | 'economics'>('matrix');
   const [isJobModalOpen, setIsJobModalOpen] = useState<boolean>(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
 
@@ -145,37 +146,61 @@ export const App: React.FC = () => {
         {/* Right Inspection & Analytics Sidebar (35%) */}
         <div className="w-[450px] border-l border-slate-800/90 bg-slate-950 flex flex-col h-full overflow-hidden shadow-2xl">
           {/* Sidebar Tab Bar */}
-          <div className="h-10 border-b border-slate-800 bg-slate-950/90 px-3 flex items-center gap-1.5">
+          <div className="h-10 border-b border-slate-800 bg-slate-950/90 px-2 flex items-center gap-1">
+            <button
+              onClick={() => setSidebarTab('matrix')}
+              className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                sidebarTab === 'matrix'
+                  ? 'bg-slate-800 text-emerald-400 border border-slate-700'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>Zone Matrix</span>
+            </button>
             <button
               onClick={() => setSidebarTab('inspector')}
-              className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+              className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
                 sidebarTab === 'inspector'
                   ? 'bg-slate-800 text-emerald-400 border border-slate-700'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               <ShieldAlert className="w-3.5 h-3.5" />
-              <span>Zone & Prescription</span>
+              <span>Prescription</span>
             </button>
             <button
               onClick={() => setSidebarTab('economics')}
-              className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+              className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
                 sidebarTab === 'economics'
                   ? 'bg-slate-800 text-emerald-400 border border-slate-700'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               <DollarSign className="w-3.5 h-3.5" />
-              <span>Agronomic ROI</span>
+              <span>ROI</span>
             </button>
           </div>
 
           {/* Tab Content */}
           <div className="flex-1 overflow-y-auto">
-            {sidebarTab === 'inspector' ? (
+            {sidebarTab === 'matrix' ? (
+              <ZoneTable
+                zones={zones}
+                activeField={activeField}
+                selectedZone={selectedZone}
+                onSelectZone={(z) => setSelectedZone(z)}
+                onInspectZone={(z) => {
+                  setSelectedZone(z);
+                  setSidebarTab('inspector');
+                }}
+                daysHorizon={daysHorizon}
+              />
+            ) : sidebarTab === 'inspector' ? (
               <ZoneInspector
                 selectedZone={selectedZone}
                 onClearSelection={() => setSelectedZone(null)}
+                onOpenMatrix={() => setSidebarTab('matrix')}
               />
             ) : (
               <div className="p-4 space-y-4">
