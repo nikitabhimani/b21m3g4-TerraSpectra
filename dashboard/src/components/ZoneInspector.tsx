@@ -19,12 +19,14 @@ interface ZoneInspectorProps {
   selectedZone: ZoneFeature | null;
   onClearSelection: () => void;
   onOpenMatrix?: () => void;
+  onProbeZone?: (zone: ZoneFeature) => void;
 }
 
 export const ZoneInspector: React.FC<ZoneInspectorProps> = ({
   selectedZone,
   onClearSelection,
   onOpenMatrix,
+  onProbeZone,
 }) => {
   if (!selectedZone) {
     return (
@@ -226,6 +228,17 @@ export const ZoneInspector: React.FC<ZoneInspectorProps> = ({
           <span className="text-emerald-400 font-mono">Precision Grid</span>
         </div>
       </div>
+
+      {/* Interactive Hyperspectral Pixel Probe Button */}
+      {onProbeZone && (
+        <button
+          onClick={() => onProbeZone(selectedZone)}
+          className="w-full py-2.5 px-3 rounded-xl bg-cyan-950/80 hover:bg-cyan-900 text-cyan-300 border border-cyan-500/50 text-xs font-semibold flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(6,182,212,0.15)] transition-all hover:shadow-[0_0_20px_rgba(6,182,212,0.3)]"
+        >
+          <Crosshair className="w-4 h-4 text-cyan-400" />
+          <span>Probe Zone Centroid Spectrum (200 Bands)</span>
+        </button>
+      )}
     </div>
   );
 };

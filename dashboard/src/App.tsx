@@ -22,9 +22,11 @@ import { RoiCalculator } from './components/Economics/RoiCalculator';
 import { JobModal } from './components/JobModal';
 import { ExportModal } from './components/ExportModal';
 import { ZoneTable } from './components/ZoneTable';
+import { PixelProbeModal } from './components/PixelProbeModal';
 import { ApiService } from './services/api';
-import { FieldItem, SceneItem, ZoneCollection, ZoneFeature } from './types';
+import { FieldItem, PixelProbeData, SceneItem, ZoneCollection, ZoneFeature } from './types';
 import { CONTRACT_SAMPLE_ZONES, SAMPLE_FIELDS, SAMPLE_SCENES } from './fixtures/mockData';
+import { sampleHyperspectralPixel } from './services/pixelProbe';
 
 export const App: React.FC = () => {
   const [apiStatus, setApiStatus] = useState<string>('checking...');
@@ -39,6 +41,8 @@ export const App: React.FC = () => {
   const [sidebarTab, setSidebarTab] = useState<'matrix' | 'inspector' | 'economics'>('matrix');
   const [isJobModalOpen, setIsJobModalOpen] = useState<boolean>(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
+  const [probedPixel, setProbedPixel] = useState<PixelProbeData | null>(null);
+  const [isProbeModalOpen, setIsProbeModalOpen] = useState<boolean>(false);
 
   // Initial load & health probe
   useEffect(() => {
@@ -98,6 +102,19 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleProbePixel = (probe: PixelProbeData) => {
+    setProbedPixel(probe);
+    setIsProbeModalOpen(true);
+  };
+
+  const handleProbeZone = (zone: ZoneFeature) => {
+    const ring = zone.geometry.coordinates[0];
+    const centerLng = ring.reduce((sum, pt) => sum + pt[0], 0) / ring.length;
+    const centerLat = ring.reduce((sum, pt) => sum + pt[1], 0) / ring.length;
+    const probe = sampleHyperspectralPixel(centerLat, centerLng, activeField, zones);
+    handleProbePixel(probe);
+  };
+
   // Calculate at-risk acres
   const atRiskAcres = (zones.features || []).reduce(
     (acc, f) => (f.properties.risk_class > 0 ? acc + f.properties.area_acres : acc),
@@ -132,6 +149,7 @@ export const App: React.FC = () => {
             selectedZone={selectedZone}
             onSelectZone={(z) => setSelectedZone(z)}
             daysHorizon={daysHorizon}
+            onProbePixel={handleProbePixel}
           />
 
           {/* Floating Forecast Slider Control */}
@@ -201,6 +219,7 @@ export const App: React.FC = () => {
                 selectedZone={selectedZone}
                 onClearSelection={() => setSelectedZone(null)}
                 onOpenMatrix={() => setSidebarTab('matrix')}
+                onProbeZone={handleProbeZone}
               />
             ) : (
               <div className="p-4 space-y-4">
@@ -251,6 +270,12 @@ export const App: React.FC = () => {
         fieldName={activeField.name}
         cropType={activeField.crop_type}
         totalAcres={activeField.total_acres}
+      />
+
+      <PixelProbeModal
+        isOpen={isProbeModalOpen}
+        onClose={() => setIsProbeModalOpen(false)}
+        probeData={probedPixel}
       />
     </div>
   );
