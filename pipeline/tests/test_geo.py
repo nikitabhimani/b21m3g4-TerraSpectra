@@ -65,10 +65,10 @@ def test_nodata_mask_flags_nodata_value():
 
     mask = nodata_mask(cube, nodata=-1.0)
 
-    assert mask[0, 0] == True
-    assert mask[0, 1] == False
-    assert mask[1, 0] == False
-    assert mask[1, 1] == False
+    assert bool(mask[0, 0])
+    assert not bool(mask[0, 1])
+    assert not bool(mask[1, 0])
+    assert not bool(mask[1, 1])
 
 
 def test_nodata_mask_flags_nan():
@@ -80,8 +80,8 @@ def test_nodata_mask_flags_nan():
 
     mask = nodata_mask(cube, nodata=-1.0)
 
-    assert mask[1, 1] == True
-    assert mask[0, 0] == False
+    assert bool(mask[1, 1])
+    assert not bool(mask[0, 0])
 
 
 def test_geoms_bounds_single_polygon():
