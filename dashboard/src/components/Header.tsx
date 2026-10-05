@@ -28,7 +28,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenExportModal,
   activeJobId,
 }) => {
-  const isOnline = apiStatus.includes('healthy');
+  const isOnline = !isDemoMode && (apiStatus === 'ok' || apiStatus === 'degraded' || apiStatus === 'healthy');
 
   return (
     <header className="h-16 border-b border-slate-800 bg-slate-900/90 backdrop-blur-md px-6 flex items-center justify-between z-30 select-none">

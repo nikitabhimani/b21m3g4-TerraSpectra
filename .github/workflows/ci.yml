@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: [main, Ankit-Space, member-vaishali, "p[1-4]/*"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  python-contracts:
+    name: Contracts & Python Modules
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        module: [contracts/python, pipeline, model, api]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.11
+
+      - name: Install dependencies
+        working-directory: ${{ matrix.module }}
+        run: uv sync --all-extras
+
+      - name: Run Ruff Lint
+        working-directory: ${{ matrix.module }}
+        run: uv run ruff check .
+
+      - name: Run Pytest
+        working-directory: ${{ matrix.module }}
+        run: uv run pytest -q
+
+  frontend-dashboard:
+    name: Dashboard (React + TypeScript)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dashboard
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck and Build
+        run: npm run build
+
+      - name: Run Vitest Suite
+        run: npm test
+
+  docker-build-verification:
+    name: Docker Builds Verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Dashboard Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: dashboard/Dockerfile
+          push: false
+          tags: terraspectra/dashboard:test

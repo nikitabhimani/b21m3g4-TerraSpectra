@@ -1,0 +1,12 @@
+# TerraSpectra Monorepo CODEOWNERS
+# Rule: Each person owns their subsystem folder.
+# contracts/ changes require shared approval across all component owners.
+
+*                     @nikitabhimani
+contracts/            @nikitabhimani @AnkitPadhiyar
+pipeline/             @nikitabhimani
+model/                @AnkitPadhiyar
+api/                  @nikitabhimani @AnkitPadhiyar
+dashboard/            @AnkitPadhiyar
+scripts/              @nikitabhimani @AnkitPadhiyar
+.github/              @nikitabhimani
