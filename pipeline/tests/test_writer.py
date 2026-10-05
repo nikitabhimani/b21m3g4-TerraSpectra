@@ -87,7 +87,9 @@ def test_cube_writer_write_rejects_wrong_block_bands(tmp_path):
         writer.abort()
 
 
-def test_export_zarr_without_zarr_installed_raises_clear_error(synthetic_cog, tmp_path, monkeypatch):
+def test_export_zarr_without_zarr_installed_raises_clear_error(
+    synthetic_cog, tmp_path, monkeypatch
+):
     """Without the zarr extra installed, export_zarr should raise a clear ImportError."""
     import builtins
     real_import = builtins.__import__
