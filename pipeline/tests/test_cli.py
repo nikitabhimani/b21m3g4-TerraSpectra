@@ -38,26 +38,28 @@ def test_info_process_indices_stats(tmp_path: Path, synthetic_cog: Path) -> None
     stats_cmd = ["stats", str(synthetic_cog), str(stats), "--windows", "2"]
     assert runner.invoke(app, stats_cmd).exit_code == 0
 
+    import importlib.util
+
     out = tmp_path / "processed.tif"
     zarr_out = tmp_path / "processed.zarr"
-    result = runner.invoke(
-        app,
-        [
-            "--log-level",
-            "WARNING",
-            "process",
-            str(synthetic_cog),
-            str(out),
-            "--no-cloud-mask",
-            "--stats",
-            str(stats),
-            "--zarr",
-            str(zarr_out),
-        ],
-    )
+    has_zarr = importlib.util.find_spec("zarr") is not None
+    cmd = [
+        "--log-level",
+        "WARNING",
+        "process",
+        str(synthetic_cog),
+        str(out),
+        "--no-cloud-mask",
+        "--stats",
+        str(stats),
+    ]
+    if has_zarr:
+        cmd.extend(["--zarr", str(zarr_out)])
+    result = runner.invoke(app, cmd)
     assert result.exit_code == 0, result.output
     assert json.loads(result.output.strip().splitlines()[-1])["size"] == [64, 64]
-    assert zarr_out.exists()
+    if has_zarr:
+        assert zarr_out.exists()
 
     idx = tmp_path / "indices.tif"
     result = runner.invoke(app, ["indices", str(out), str(idx), "--names", "ndvi,rep"])

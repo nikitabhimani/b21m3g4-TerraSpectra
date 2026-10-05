@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 import numpy as np
-
+import pytest
 from terraspectra_contracts import N_BANDS, WAVELENGTHS_NM, ZoneFeatureCollection
 from terraspectra_contracts.fixtures import make_synthetic_cube
 
@@ -29,12 +29,17 @@ def test_sample_zones_match_schema():
 
 
 def test_packaged_wavelengths_in_sync_with_canonical_copy():
-    pkg = Path(__file__).resolve().parents[1] / "src/terraspectra_contracts/wavelengths.json"
-    assert json.loads(pkg.read_text()) == json.loads((FIXTURES.parent / "wavelengths.json").read_text())
+    pkg = (
+        Path(__file__).resolve().parents[1]
+        / "src/terraspectra_contracts/wavelengths.json"
+    )
+    assert json.loads(pkg.read_text()) == json.loads(
+        (FIXTURES.parent / "wavelengths.json").read_text()
+    )
 
 
 def test_stub_model_honours_c2(tmp_path):
-    import torch
+    torch = pytest.importorskip("torch")
 
     from terraspectra_contracts.fixtures import export_stub_model
 
@@ -47,7 +52,7 @@ def test_stub_model_honours_c2(tmp_path):
 
 
 def test_cog_fixture(tmp_path):
-    import rasterio
+    rasterio = pytest.importorskip("rasterio")
 
     from terraspectra_contracts.fixtures import write_synthetic_cube
 

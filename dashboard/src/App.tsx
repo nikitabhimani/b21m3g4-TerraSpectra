@@ -21,9 +21,12 @@ import { ForecastSlider } from './components/ForecastSlider';
 import { RoiCalculator } from './components/Economics/RoiCalculator';
 import { JobModal } from './components/JobModal';
 import { ExportModal } from './components/ExportModal';
+import { ZoneTable } from './components/ZoneTable';
+import { PixelProbeModal } from './components/PixelProbeModal';
 import { ApiService } from './services/api';
-import { FieldItem, SceneItem, ZoneCollection, ZoneFeature } from './types';
+import { FieldItem, PixelProbeData, SceneItem, ZoneCollection, ZoneFeature } from './types';
 import { CONTRACT_SAMPLE_ZONES, SAMPLE_FIELDS, SAMPLE_SCENES } from './fixtures/mockData';
+import { sampleHyperspectralPixel } from './services/pixelProbe';
 
 export const App: React.FC = () => {
   const [apiStatus, setApiStatus] = useState<string>('checking...');
@@ -35,9 +38,11 @@ export const App: React.FC = () => {
   const [zones, setZones] = useState<ZoneCollection>(CONTRACT_SAMPLE_ZONES);
   const [selectedZone, setSelectedZone] = useState<ZoneFeature | null>(null);
   const [daysHorizon, setDaysHorizon] = useState<number>(30);
-  const [sidebarTab, setSidebarTab] = useState<'inspector' | 'economics'>('inspector');
+  const [sidebarTab, setSidebarTab] = useState<'matrix' | 'inspector' | 'economics'>('matrix');
   const [isJobModalOpen, setIsJobModalOpen] = useState<boolean>(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
+  const [probedPixel, setProbedPixel] = useState<PixelProbeData | null>(null);
+  const [isProbeModalOpen, setIsProbeModalOpen] = useState<boolean>(false);
 
   // Initial load & health probe
   useEffect(() => {
@@ -97,6 +102,19 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleProbePixel = (probe: PixelProbeData) => {
+    setProbedPixel(probe);
+    setIsProbeModalOpen(true);
+  };
+
+  const handleProbeZone = (zone: ZoneFeature) => {
+    const ring = zone.geometry.coordinates[0];
+    const centerLng = ring.reduce((sum, pt) => sum + pt[0], 0) / ring.length;
+    const centerLat = ring.reduce((sum, pt) => sum + pt[1], 0) / ring.length;
+    const probe = sampleHyperspectralPixel(centerLat, centerLng, activeField, zones);
+    handleProbePixel(probe);
+  };
+
   // Calculate at-risk acres
   const atRiskAcres = (zones.features || []).reduce(
     (acc, f) => (f.properties.risk_class > 0 ? acc + f.properties.area_acres : acc),
@@ -131,6 +149,7 @@ export const App: React.FC = () => {
             selectedZone={selectedZone}
             onSelectZone={(z) => setSelectedZone(z)}
             daysHorizon={daysHorizon}
+            onProbePixel={handleProbePixel}
           />
 
           {/* Floating Forecast Slider Control */}
@@ -145,37 +164,62 @@ export const App: React.FC = () => {
         {/* Right Inspection & Analytics Sidebar (35%) */}
         <div className="w-[450px] border-l border-slate-800/90 bg-slate-950 flex flex-col h-full overflow-hidden shadow-2xl">
           {/* Sidebar Tab Bar */}
-          <div className="h-10 border-b border-slate-800 bg-slate-950/90 px-3 flex items-center gap-1.5">
+          <div className="h-10 border-b border-slate-800 bg-slate-950/90 px-2 flex items-center gap-1">
+            <button
+              onClick={() => setSidebarTab('matrix')}
+              className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                sidebarTab === 'matrix'
+                  ? 'bg-slate-800 text-emerald-400 border border-slate-700'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>Zone Matrix</span>
+            </button>
             <button
               onClick={() => setSidebarTab('inspector')}
-              className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+              className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
                 sidebarTab === 'inspector'
                   ? 'bg-slate-800 text-emerald-400 border border-slate-700'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               <ShieldAlert className="w-3.5 h-3.5" />
-              <span>Zone & Prescription</span>
+              <span>Prescription</span>
             </button>
             <button
               onClick={() => setSidebarTab('economics')}
-              className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+              className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
                 sidebarTab === 'economics'
                   ? 'bg-slate-800 text-emerald-400 border border-slate-700'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               <DollarSign className="w-3.5 h-3.5" />
-              <span>Agronomic ROI</span>
+              <span>ROI</span>
             </button>
           </div>
 
           {/* Tab Content */}
           <div className="flex-1 overflow-y-auto">
-            {sidebarTab === 'inspector' ? (
+            {sidebarTab === 'matrix' ? (
+              <ZoneTable
+                zones={zones}
+                activeField={activeField}
+                selectedZone={selectedZone}
+                onSelectZone={(z) => setSelectedZone(z)}
+                onInspectZone={(z) => {
+                  setSelectedZone(z);
+                  setSidebarTab('inspector');
+                }}
+                daysHorizon={daysHorizon}
+              />
+            ) : sidebarTab === 'inspector' ? (
               <ZoneInspector
                 selectedZone={selectedZone}
                 onClearSelection={() => setSelectedZone(null)}
+                onOpenMatrix={() => setSidebarTab('matrix')}
+                onProbeZone={handleProbeZone}
               />
             ) : (
               <div className="p-4 space-y-4">
@@ -223,6 +267,15 @@ export const App: React.FC = () => {
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}
         zones={zones}
+        fieldName={activeField.name}
+        cropType={activeField.crop_type}
+        totalAcres={activeField.total_acres}
+      />
+
+      <PixelProbeModal
+        isOpen={isProbeModalOpen}
+        onClose={() => setIsProbeModalOpen(false)}
+        probeData={probedPixel}
       />
     </div>
   );

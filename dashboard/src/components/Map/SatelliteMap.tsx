@@ -10,10 +10,12 @@ import {
   Scan, 
   Sliders, 
   SunMedium, 
+  Target, 
   Wheat, 
   Zap 
 } from 'lucide-react';
-import { FieldItem, ZoneCollection, ZoneFeature } from '../../types';
+import { FieldItem, PixelProbeData, ZoneCollection, ZoneFeature } from '../../types';
+import { sampleHyperspectralPixel } from '../../services/pixelProbe';
 
 interface SatelliteMapProps {
   zones: ZoneCollection;
@@ -23,6 +25,7 @@ interface SatelliteMapProps {
   selectedZone: ZoneFeature | null;
   onSelectZone: (zone: ZoneFeature) => void;
   daysHorizon: number;
+  onProbePixel?: (probe: PixelProbeData) => void;
 }
 
 export const SatelliteMap: React.FC<SatelliteMapProps> = ({
@@ -33,6 +36,7 @@ export const SatelliteMap: React.FC<SatelliteMapProps> = ({
   selectedZone,
   onSelectZone,
   daysHorizon,
+  onProbePixel,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -40,6 +44,18 @@ export const SatelliteMap: React.FC<SatelliteMapProps> = ({
   const zonesLayerGroupRef = useRef<L.LayerGroup | null>(null);
   const heatmapLayerGroupRef = useRef<L.LayerGroup | null>(null);
   const droneLayerGroupRef = useRef<L.LayerGroup | null>(null);
+  const probeLayerGroupRef = useRef<L.LayerGroup | null>(null);
+
+  const [isProbeMode, setIsProbeMode] = useState<boolean>(false);
+  const isProbeModeRef = useRef<boolean>(false);
+  isProbeModeRef.current = isProbeMode;
+
+  const activeFieldRef = useRef(activeField);
+  activeFieldRef.current = activeField;
+  const zonesRef = useRef(zones);
+  zonesRef.current = zones;
+  const onProbePixelRef = useRef(onProbePixel);
+  onProbePixelRef.current = onProbePixel;
 
   const [basemapMode, setBasemapMode] = useState<'satellite' | 'dark' | 'topo'>('satellite');
   const [spectralFilter, setSpectralFilter] = useState<'true_color' | 'cir' | 'chlorophyll'>('true_color');
@@ -95,16 +111,28 @@ export const SatelliteMap: React.FC<SatelliteMapProps> = ({
       const zonesGroup = L.layerGroup().addTo(map);
       const heatmapGroup = L.layerGroup().addTo(map);
       const droneGroup = L.layerGroup().addTo(map);
+      const probeGroup = L.layerGroup().addTo(map);
 
       zonesLayerGroupRef.current = zonesGroup;
       heatmapLayerGroupRef.current = heatmapGroup;
       droneLayerGroupRef.current = droneGroup;
+      probeLayerGroupRef.current = probeGroup;
 
       map.on('mousemove', (e: L.LeafletMouseEvent) => {
         setCursorCoords({
           lat: e.latlng.lat.toFixed(6),
           lng: e.latlng.lng.toFixed(6),
         });
+      });
+
+      map.on('click', (e: L.LeafletMouseEvent) => {
+        if (isProbeModeRef.current) {
+          const lat = e.latlng.lat;
+          const lng = e.latlng.lng;
+          renderProbeReticle(lat, lng);
+          const probe = sampleHyperspectralPixel(lat, lng, activeFieldRef.current, zonesRef.current);
+          onProbePixelRef.current?.(probe);
+        }
       });
 
       mapInstanceRef.current = map;
@@ -117,6 +145,39 @@ export const SatelliteMap: React.FC<SatelliteMapProps> = ({
       }
     };
   }, []);
+
+  const renderProbeReticle = (lat: number, lng: number) => {
+    if (!probeLayerGroupRef.current) return;
+    probeLayerGroupRef.current.clearLayers();
+    const reticleHtml = `
+      <div style="position: relative; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; pointer-events: none;">
+        <div style="position: absolute; width: 34px; height: 34px; border-radius: 50%; border: 2px solid #06b6d4; opacity: 0.8; animation: ping 1.4s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
+        <div style="position: absolute; width: 14px; height: 14px; border-radius: 50%; background: rgba(6, 182, 212, 0.4); border: 2px solid #ffffff; box-shadow: 0 0 10px #06b6d4;"></div>
+        <div style="width: 4px; height: 4px; border-radius: 50%; background: #ffffff;"></div>
+        <div style="position: absolute; width: 38px; height: 1.5px; background: rgba(6, 182, 212, 0.9);"></div>
+        <div style="position: absolute; width: 1.5px; height: 38px; background: rgba(6, 182, 212, 0.9);"></div>
+      </div>
+    `;
+    const reticleIcon = L.divIcon({
+      className: 'pixel-probe-hud-reticle',
+      html: reticleHtml,
+      iconSize: [34, 34],
+      iconAnchor: [17, 17],
+    });
+    L.marker([lat, lng], { icon: reticleIcon }).addTo(probeLayerGroupRef.current);
+  };
+
+  // Synchronize map cursor when probe mode toggles
+  useEffect(() => {
+    if (mapInstanceRef.current) {
+      const container = mapInstanceRef.current.getContainer();
+      if (isProbeMode) {
+        container.style.cursor = 'crosshair';
+      } else {
+        container.style.cursor = '';
+      }
+    }
+  }, [isProbeMode]);
 
   // Update Basemap Tiles
   useEffect(() => {
@@ -196,8 +257,16 @@ export const SatelliteMap: React.FC<SatelliteMapProps> = ({
         fillOpacity: isSelected ? 0.8 : p.risk_class === 0 ? 0.3 : 0.65,
       });
 
-      poly.on('click', () => {
-        onSelectZone(f);
+      poly.on('click', (e: L.LeafletMouseEvent) => {
+        if (isProbeModeRef.current) {
+          const lat = e.latlng.lat;
+          const lng = e.latlng.lng;
+          renderProbeReticle(lat, lng);
+          const probe = sampleHyperspectralPixel(lat, lng, activeFieldRef.current, zonesRef.current);
+          onProbePixelRef.current?.(probe);
+        } else {
+          onSelectZone(f);
+        }
       });
 
       poly.bindTooltip(
@@ -394,6 +463,22 @@ export const SatelliteMap: React.FC<SatelliteMapProps> = ({
               Topo 3D
             </button>
           </div>
+
+          {/* Hyperspectral Pixel Probe Mode Button */}
+          <div className="bg-slate-950/90 backdrop-blur-md border border-slate-800/90 rounded-xl p-1 shadow-xl flex items-center text-xs">
+            <button
+              onClick={() => setIsProbeMode(!isProbeMode)}
+              title="Sample 200-Band Hyperspectral Profile at any coordinate"
+              className={`px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1.5 transition-all ${
+                isProbeMode
+                  ? 'bg-cyan-500 text-slate-950 shadow-[0_0_12px_rgba(6,182,212,0.6)] font-bold'
+                  : 'text-cyan-400 hover:text-cyan-200 hover:bg-slate-800/80'
+              }`}
+            >
+              <Target className={`w-3.5 h-3.5 ${isProbeMode ? 'animate-spin-slow text-slate-950' : 'text-cyan-400'}`} />
+              <span>{isProbeMode ? 'Probe Active' : 'Probe Pixel'}</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -408,6 +493,20 @@ export const SatelliteMap: React.FC<SatelliteMapProps> = ({
             : ''
         }`}
       />
+
+      {/* Floating Active Probe Banner */}
+      {isProbeMode && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-30 bg-slate-950/95 border border-cyan-500/70 backdrop-blur-md px-4 py-2 rounded-full shadow-[0_0_24px_rgba(6,182,212,0.4)] text-cyan-200 text-xs font-mono flex items-center gap-3 animate-pulse">
+          <Target className="w-4 h-4 text-cyan-400 animate-spin-slow" />
+          <span>PROBE ACTIVE: Click anywhere on the map to sample 200-band spectral profile</span>
+          <button
+            onClick={() => setIsProbeMode(false)}
+            className="ml-2 px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 hover:text-white border border-cyan-800 text-[10px] font-sans uppercase font-bold"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
 
       {/* Orbital Pushbroom Laser Scan Beam Animation */}
       {isScanning && (

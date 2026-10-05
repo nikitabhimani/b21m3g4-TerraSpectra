@@ -86,3 +86,45 @@ export interface SpectralPoint {
   stressed: number;
   importance: number;
 }
+
+export interface PixelIndices {
+  ndvi: number;
+  ndre: number;
+  pri: number;
+  rep: number;
+  ndwi: number;
+  mcari: number;
+}
+
+export interface PixelSpectrumBand {
+  wavelength: number;
+  reflectance: number;
+  healthyReflectance: number;
+  stressedReflectance: number;
+  soilReflectance: number;
+  bandIndex: number;
+  snr: number;
+}
+
+export interface PixelProbeData {
+  lat: number;
+  lng: number;
+  timestamp: string;
+  field_id: string;
+  field_name: string;
+  risk_class: RiskClass;
+  risk_class_name: RiskClassName;
+  risk_score: number;
+  days_to_onset: number;
+  dominant_indicator: DominantIndicator;
+  indices: PixelIndices;
+  spectrum: PixelSpectrumBand[];
+  nearestZoneId?: string;
+  zone_name?: string;
+  diagnosticNotes: string;
+  biophysicalMechanisms: string[];
+  recommendedIntervention: string;
+  elevationMeters: number;
+  gsdMeters: number;
+  sensorId: string;
+}
