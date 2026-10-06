@@ -85,10 +85,7 @@ class LocalStorage:
         """Map a ``file://`` URI (or bare path) to a local path inside the allowed roots."""
         parsed = urlparse(uri)
         if parsed.scheme in ("", "file"):
-            if parsed.scheme == "file":
-                raw = url2pathname(unquote(parsed.path))
-            else:
-                raw = unquote(uri)
+            raw = url2pathname(unquote(parsed.path)) if parsed.scheme == "file" else unquote(uri)
             path = Path(raw).resolve()
             if not any(path.is_relative_to(root) for root in self.allowed_roots):
                 raise UnsupportedUriError("URI points outside the allowed storage roots")

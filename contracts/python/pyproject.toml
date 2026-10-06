@@ -22,4 +22,5 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
+testpaths = ["tests"]
 filterwarnings = ["ignore::FutureWarning", "ignore::DeprecationWarning"]

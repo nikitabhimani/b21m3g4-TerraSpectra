@@ -87,9 +87,20 @@ def test_cube_writer_write_rejects_wrong_block_bands(tmp_path):
         writer.abort()
 
 
-def test_export_zarr_without_zarr_installed_raises_clear_error(synthetic_cog, tmp_path):
+def test_export_zarr_without_zarr_installed_raises_clear_error(
+    synthetic_cog, tmp_path, monkeypatch
+):
     """Without the zarr extra installed, export_zarr should raise a clear ImportError."""
+    import builtins
+    real_import = builtins.__import__
+
+    def mock_import(name, *args, **kwargs):
+        if name == "zarr":
+            raise ImportError("No module named 'zarr'")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", mock_import)
     zarr_out = tmp_path / "out.zarr"
 
     with pytest.raises(ImportError, match="Zarr export needs"):
-        export_zarr(synthetic_cog, zarr_out)
+        export_zarr(synthetic_cog, zarr_out)
