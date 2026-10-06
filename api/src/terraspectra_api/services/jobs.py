@@ -20,6 +20,7 @@ from terraspectra_api.core.stitcher import Stitcher, write_risk_cog
 from terraspectra_api.core.zones import ZoneConfig, extract_zones
 from terraspectra_api.db import Database
 from terraspectra_api.models import Job, utcnow
+from terraspectra_api.services.events import publish_job_event
 from terraspectra_api.services.fields import load_fields
 from terraspectra_api.settings import Settings, get_settings
 from terraspectra_api.storage import Storage, build_storage
@@ -37,6 +38,7 @@ class JobContext:
     db: Database
     storage: Storage
     engine: InferenceEngine
+    redis: Any | None = None
     extras: dict[str, Any] = field(default_factory=dict)
 
 
@@ -64,7 +66,17 @@ def build_context(settings: Settings | None = None, load_engine: bool = True) ->
     engine = build_engine(settings, storage)
     if load_engine:
         engine.load()
-    return JobContext(settings=settings, db=db, storage=storage, engine=engine)
+    redis_client = None
+    if settings.redis_url:
+        try:
+            from redis import Redis
+
+            rc = Redis.from_url(settings.redis_url, socket_connect_timeout=0.5)
+            rc.ping()
+            redis_client = rc
+        except Exception:
+            redis_client = None
+    return JobContext(settings=settings, db=db, storage=storage, engine=engine, redis=redis_client)
 
 
 def set_context(ctx: JobContext | None) -> None:
@@ -81,17 +93,23 @@ def get_context() -> JobContext:
 
 
 class ProgressReporter:
-    """Throttled progress writes (at most every ``min_interval`` s or ``min_step``)."""
+    """Throttled progress writes and real-time SSE broadcasts."""
 
     def __init__(
-        self, db: Database, job_id: str, min_interval: float = 1.0, min_step: float = 0.05
+        self,
+        db: Database,
+        job_id: str,
+        min_interval: float = 0.5,
+        min_step: float = 0.02,
+        redis_client: Any | None = None,
     ) -> None:
         self.db, self.job_id = db, job_id
         self.min_interval, self.min_step = min_interval, min_step
+        self.redis_client = redis_client
         self._last_t = 0.0
         self._last_p = 0.0
 
-    def __call__(self, progress: float, force: bool = False) -> None:
+    def __call__(self, progress: float, step: str | None = None, force: bool = False) -> None:
         progress = float(min(max(progress, 0.0), 1.0))
         now = time.monotonic()
         if not force and (
@@ -100,6 +118,18 @@ class ProgressReporter:
             return
         self._last_t, self._last_p = now, progress
         _update(self.db, self.job_id, progress=progress)
+        publish_job_event(
+            self.job_id,
+            "progress",
+            {
+                "job_id": self.job_id,
+                "status": "running",
+                "progress": progress,
+                "step": step or f"Processing ({int(progress * 100)}%)",
+                "timestamp": utcnow().isoformat(),
+            },
+            self.redis_client,
+        )
 
 
 def _update(db: Database, job_id: str, **values: Any) -> None:
@@ -154,13 +184,25 @@ def run_job(job_id: str, ctx: JobContext | None = None) -> None:
         )
     except Exception as exc:
         log.exception("job failed", extra={"job_id": job_id})
+        err_msg = f"{type(exc).__name__}: {exc}"[:2000]
         try:
             _update(
                 ctx.db,
                 job_id,
                 status=JobState.FAILED,
-                error=f"{type(exc).__name__}: {exc}"[:2000],
+                error=err_msg,
                 finished_at=utcnow(),
+            )
+            publish_job_event(
+                job_id,
+                "error",
+                {
+                    "job_id": job_id,
+                    "status": "failed",
+                    "error": err_msg,
+                    "timestamp": utcnow().isoformat(),
+                },
+                ctx.redis,
             )
         except Exception:
             log.exception("could not record job failure", extra={"job_id": job_id})
@@ -177,11 +219,12 @@ def _execute(
     settings, storage, engine = ctx.settings, ctx.storage, ctx.engine
     if not engine.ready:
         engine.load()
-    report = ProgressReporter(ctx.db, job_id)
+    report = ProgressReporter(ctx.db, job_id, redis_client=ctx.redis)
     cube_path: Path = storage.resolve_uri(scene_uri)
     if aoi is None and field_id is not None:
         aoi = load_fields(settings.fields_path).geometry_of(field_id)
 
+    report(0.05, step="Validating scene format and AOI geometry", force=True)
     with rasterio.open(cube_path) as src:
         crs, transform = src.crs, src.transform
         height, width = src.height, src.width
@@ -200,21 +243,24 @@ def _execute(
     )
     total = max(1, len(chunker))
     done = 0
-    report(0.05, force=True)
+    report(0.10, step=f"Chunking cube into {total} 64x64 patches", force=True)
     for batch in chunker.batches():
         probs, onset = engine.predict(batch.data)
         stitcher.add(probs, onset, batch.rows, batch.cols, batch.valid)
         done += len(batch)
-        report(0.05 + 0.80 * done / total)
-    # TODO(Day 10): count skipped (all-nodata) windows too so progress is exact.
+        report(
+            0.10 + 0.75 * done / total,
+            step=f"Inferred {done}/{total} windows with 3D-CNN+ViT hybrid",
+        )
 
+    report(0.88, step="Stitching risk raster & writing 5-band Cloud-Optimized GeoTIFF", force=True)
     probs_full, onset_full, valid = stitcher.finalize(aoi_mask)
     risk_path = storage.risk_path(job_id)
     write_risk_cog(
         risk_path, probs_full, onset_full, crs, transform, {"job_id": job_id, "scene_id": scene_id}
     )
-    report(0.9, force=True)
 
+    report(0.95, step="Extracting epidemiological risk zones & computing metrics", force=True)
     zones, summary = extract_zones(
         probs_full,
         onset_full,
@@ -242,4 +288,17 @@ def _execute(
         zones_path=str(zones_path),
         finished_at=utcnow(),
         error=None,
+    )
+    publish_job_event(
+        job_id,
+        "complete",
+        {
+            "job_id": job_id,
+            "status": "succeeded",
+            "progress": 1.0,
+            "step": "Inference and zone extraction completed successfully",
+            "summary": summary.model_dump(mode="json"),
+            "timestamp": utcnow().isoformat(),
+        },
+        ctx.redis,
     )

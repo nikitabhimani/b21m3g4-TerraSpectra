@@ -220,3 +220,27 @@ def test_upload_too_large(client: TestClient, auth: dict[str, str]) -> None:
         headers=auth,
     )
     assert resp.status_code == 413
+
+
+def test_stream_job_events(client: TestClient, auth: dict[str, str], cube_path: Path) -> None:
+    # 1. Upload scene and create job
+    scene = _upload(client, auth, cube_path)
+    job_resp = client.post("/v1/jobs", json={"scene_id": scene["scene_id"]}, headers=auth)
+    assert job_resp.status_code == 202
+    job_id = job_resp.json()["job_id"]
+
+    # 2. Connect to SSE stream using query parameter authentication (?api_key=...)
+    api_key = auth["X-API-Key"]
+    stream_resp = client.get(f"/v1/jobs/{job_id}/stream?api_key={api_key}")
+    assert stream_resp.status_code == 200
+    assert "text/event-stream" in stream_resp.headers["content-type"]
+    assert "no-cache" in stream_resp.headers["cache-control"]
+
+    content = stream_resp.text
+    assert "event: " in content
+    assert "data: " in content
+    assert job_id in content
+
+    # 3. Nonexistent job stream returns 404
+    missing_resp = client.get("/v1/jobs/job_nonexistent_99/stream", headers=auth)
+    assert missing_resp.status_code == 404

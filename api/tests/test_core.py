@@ -223,3 +223,47 @@ def test_colorize_and_transparent_tile() -> None:
     assert tuple(rgb[:, 0, 1]) == (215, 48, 39)
     assert alpha.tolist() == [[210, 0]]
     assert transparent_tile().startswith(b"\x89PNG")
+
+
+def test_tile_renderer_redis_caching(tmp_path: Path) -> None:
+    from terraspectra_api.core.tiles import TileRenderer
+
+    class FakeRedis:
+        def __init__(self) -> None:
+            self.store: dict[str, bytes] = {}
+
+        def get(self, key: str) -> bytes | None:
+            return self.store.get(key)
+
+        def set(self, key: str, value: bytes, ex: int | None = None) -> bool:
+            self.store[key] = value
+            return True
+
+    fake_redis = FakeRedis()
+    tile_file = tmp_path / "dummy.tif"
+    tile_file.write_bytes(b"dummy")
+
+    # Mock _render to track executions
+    render_calls = 0
+
+    def mock_render(path: Path, z: int, x: int, y: int) -> bytes:
+        nonlocal render_calls
+        render_calls += 1
+        return b"fake_png_bytes"
+
+    renderer1 = TileRenderer(cache_size=10, redis_client=fake_redis)
+    renderer1._render = mock_render  # type: ignore[method-assign]
+
+    # First call: cache miss, renders and populates redis
+    data1 = renderer1.render(tile_file, z=10, x=100, y=200)
+    assert data1 == b"fake_png_bytes"
+    assert render_calls == 1
+    assert len(fake_redis.store) == 1
+
+    # Second instance with fresh memory cache: reads from redis without calling _render
+    renderer2 = TileRenderer(cache_size=10, redis_client=fake_redis)
+    renderer2._render = mock_render  # type: ignore[method-assign]
+
+    data2 = renderer2.render(tile_file, z=10, x=100, y=200)
+    assert data2 == b"fake_png_bytes"
+    assert render_calls == 1  # Not incremented!

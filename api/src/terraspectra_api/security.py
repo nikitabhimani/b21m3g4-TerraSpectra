@@ -19,10 +19,9 @@ api_key_header = APIKeyHeader(name="X-API-Key", scheme_name="ApiKeyAuth", auto_e
 def require_api_key(request: Request, api_key: str | None = Security(api_key_header)) -> str:
     """Reject requests whose ``X-API-Key`` is not in ``TS_API_KEYS``."""
     settings: Settings = request.app.state.settings
-    if api_key and any(
-        hmac.compare_digest(api_key.encode(), key.encode()) for key in settings.api_keys
-    ):
-        return api_key
+    key = api_key or request.query_params.get("api_key")
+    if key and any(hmac.compare_digest(key.encode(), k.encode()) for k in settings.api_keys):
+        return key
     raise ApiError(
         401, "missing or invalid API key", "unauthorized", {"WWW-Authenticate": "ApiKey"}
     )

@@ -80,6 +80,16 @@ export interface JobItem {
   summary?: JobSummary | null;
 }
 
+export interface JobEvent {
+  job_id: string;
+  status: 'queued' | 'running' | 'succeeded' | 'failed';
+  progress: number;
+  step?: string;
+  summary?: JobSummary | null;
+  error?: string | null;
+  timestamp?: string;
+}
+
 export interface SpectralPoint {
   wavelength: number;
   healthy: number;

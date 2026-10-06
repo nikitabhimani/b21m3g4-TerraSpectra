@@ -30,34 +30,58 @@ export const JobModal: React.FC<JobModalProps> = ({
   const [selectedScene, setSelectedScene] = useState<string>(scenes[0]?.scene_id || '');
   const [selectedField, setSelectedField] = useState<string>(fields[0]?.id || '');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [progressStep, setProgressStep] = useState(0);
+  const [progressPercent, setProgressPercent] = useState<number>(0);
+  const [activeStepText, setActiveStepText] = useState<string>('');
+  const [isStreamActive, setIsStreamActive] = useState<boolean>(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
-  const pipelineSteps = [
-    'Validating Contract C1 200-Band Cube & CRS Metadata...',
-    'Windowing into 64x64 Patches & Radiometric Robust Scaling...',
-    'Running 3D-CNN + ViT Hybrid Model Inference (models/model.pt)...',
-    'Extracting Dominant Indicators via Integrated Gradients (Contract C4)...',
-    'Executing Hann-Window Blended Stitching & Vector Polygonization...',
-  ];
-
   const handleStartScan = async () => {
     setIsProcessing(true);
-    setProgressStep(0);
+    setProgressPercent(5);
+    setActiveStepText('Connecting to inference queue & initializing pipeline...');
+    setIsStreamActive(true);
+    setErrorMessage(null);
 
-    // Call API service to register/create job
-    const job = await ApiService.createJob(selectedScene, selectedField);
+    try {
+      // 1. Create or register inference job
+      const job = await ApiService.createJob(selectedScene, selectedField);
 
-    // Step-by-step progress simulation representing live pipeline stages
-    for (let i = 0; i < pipelineSteps.length; i++) {
-      setProgressStep(i);
-      await new Promise((r) => setTimeout(r, 650));
+      // 2. Subscribe to real-time Server-Sent Events (SSE)
+      const unsubscribe = ApiService.subscribeJobEvents(
+        job.job_id,
+        (evt) => {
+          if (evt.step) {
+            setActiveStepText(evt.step);
+          }
+          if (typeof evt.progress === 'number') {
+            setProgressPercent(Math.min(100, Math.max(5, Math.round(evt.progress * 100))));
+          }
+          if (evt.status === 'succeeded') {
+            setProgressPercent(100);
+            setActiveStepText('Inference complete! Loading risk zones and tiles...');
+            setTimeout(() => {
+              setIsProcessing(false);
+              setIsStreamActive(false);
+              onJobComplete(job.job_id);
+              onClose();
+            }, 600);
+          } else if (evt.status === 'failed') {
+            setIsProcessing(false);
+            setIsStreamActive(false);
+            setErrorMessage(evt.error || 'Job failed during inference');
+          }
+        },
+        (err) => {
+          console.warn('SSE subscription error:', err);
+        }
+      );
+    } catch (err: unknown) {
+      setIsProcessing(false);
+      setIsStreamActive(false);
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to launch scan');
     }
-
-    setIsProcessing(false);
-    onJobComplete(job.job_id);
-    onClose();
   };
 
   return (
@@ -134,22 +158,37 @@ export const JobModal: React.FC<JobModalProps> = ({
           {isProcessing && (
             <div className="pt-2 space-y-3">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-emerald-400 flex items-center gap-2 font-medium">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
-                  {pipelineSteps[progressStep]}
+                <span className="text-emerald-400 flex items-center gap-2 font-medium truncate max-w-[360px]">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400 shrink-0" />
+                  <span className="truncate">{activeStepText || 'Processing hyperspectral scan...'}</span>
                 </span>
-                <span className="text-slate-400 font-mono">
-                  {Math.round(((progressStep + 1) / pipelineSteps.length) * 100)}%
+                <span className="text-emerald-400 font-mono font-bold shrink-0">
+                  {progressPercent}%
                 </span>
               </div>
-              <div className="w-full bg-slate-950 h-2 rounded-full overflow-hidden border border-slate-800">
+              <div className="w-full bg-slate-950 h-2.5 rounded-full overflow-hidden border border-slate-800">
                 <div
-                  className="h-full bg-gradient-to-r from-emerald-600 to-teal-400 rounded-full transition-all duration-300"
+                  className="h-full bg-gradient-to-r from-emerald-600 via-teal-400 to-emerald-300 rounded-full transition-all duration-300 shadow-sm shadow-emerald-500/50"
                   style={{
-                    width: `${((progressStep + 1) / pipelineSteps.length) * 100}%`,
+                    width: `${progressPercent}%`,
                   }}
                 />
               </div>
+              {isStreamActive && (
+                <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
+                  <span className="flex items-center gap-1.5 text-emerald-400/90 font-medium">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping inline-block" />
+                    SSE Telemetry Connected
+                  </span>
+                  <span className="text-slate-500 font-mono">Channel: live-stream</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {errorMessage && (
+            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs">
+              {errorMessage}
             </div>
           )}
         </div>
