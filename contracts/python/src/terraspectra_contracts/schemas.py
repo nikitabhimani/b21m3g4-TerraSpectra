@@ -14,6 +14,7 @@ class JobState(StrEnum):
     RUNNING = "running"
     SUCCEEDED = "succeeded"
     FAILED = "failed"
+    CANCELLED = "cancelled"
 
 
 class JobCreate(BaseModel):

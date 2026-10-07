@@ -115,6 +115,30 @@ paths:
             text/event-stream:
               schema: { type: string }
         "404": { $ref: "#/components/responses/Error" }
+  /v1/jobs/{job_id}/cancel:
+    post:
+      operationId: cancelJob
+      parameters: [{ $ref: "#/components/parameters/JobId" }]
+      responses:
+        "200":
+          description: Job cancelled
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Job" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /v1/jobs/{job_id}/retry:
+    post:
+      operationId: retryJob
+      parameters: [{ $ref: "#/components/parameters/JobId" }]
+      responses:
+        "202":
+          description: Job re-queued
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Job" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
   /v1/jobs/{job_id}/zones:
     get:
       operationId: getJobZones
@@ -225,7 +249,7 @@ components:
         job_id: { type: string }
         scene_id: { type: string }
         field_id: { type: [string, "null"] }
-        status: { type: string, enum: [queued, running, succeeded, failed] }
+        status: { type: string, enum: [queued, running, succeeded, failed, cancelled] }
         progress: { type: number, minimum: 0, maximum: 1 }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }

@@ -156,4 +156,66 @@ describe('ApiService Client & Contract C4 Compliance', () => {
       expect(events.length).toBe(0);
     });
   });
+
+  describe('Job Lifecycle Control: Cancellation & Retry', () => {
+    it('cancels a job in demo mode', async () => {
+      ApiService.setDemoMode(true);
+      const res = await ApiService.cancelJob('job_cancel_demo_1');
+      expect(res.job_id).toBe('job_cancel_demo_1');
+      expect(res.status).toBe('cancelled');
+      expect(res.error).toBe('Cancelled by user');
+    });
+
+    it('cancels a job via API request when online', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          job_id: 'job_live_01',
+          scene_id: 'scn_1',
+          status: 'cancelled',
+          progress: 0.45,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          error: 'Cancelled by user',
+        }),
+      });
+
+      const res = await ApiService.cancelJob('job_live_01');
+      expect(res.status).toBe('cancelled');
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/v1/jobs/job_live_01/cancel'),
+        expect.objectContaining({ method: 'POST' })
+      );
+    });
+
+    it('retries a cancelled or failed job in demo mode', async () => {
+      ApiService.setDemoMode(true);
+      const res = await ApiService.retryJob('job_retry_demo_1');
+      expect(res.job_id).toBe('job_retry_demo_1');
+      expect(res.status).toBe('queued');
+      expect(res.progress).toBe(0.05);
+      expect(res.error).toBeNull();
+    });
+
+    it('retries a job via API request when online', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          job_id: 'job_live_02',
+          scene_id: 'scn_1',
+          status: 'queued',
+          progress: 0.0,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }),
+      });
+
+      const res = await ApiService.retryJob('job_live_02');
+      expect(res.status).toBe('queued');
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/v1/jobs/job_live_02/retry'),
+        expect.objectContaining({ method: 'POST' })
+      );
+    });
+  });
 });

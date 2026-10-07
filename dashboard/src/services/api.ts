@@ -123,6 +123,68 @@ export class ApiService {
     }
   }
 
+  public static async cancelJob(jobId: string): Promise<JobItem> {
+    if (this.isDemoMode) {
+      return {
+        ...SAMPLE_JOB,
+        job_id: jobId,
+        status: 'cancelled',
+        progress: 0.0,
+        error: 'Cancelled by user',
+      };
+    }
+    try {
+      const res = await fetch(`${API_BASE}/v1/jobs/${jobId}/cancel`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-Key': this.apiKey,
+        },
+      });
+      if (!res.ok) throw new Error(`Job cancellation failed: ${res.statusText}`);
+      return await res.json();
+    } catch {
+      return {
+        ...SAMPLE_JOB,
+        job_id: jobId,
+        status: 'cancelled',
+        progress: 0.0,
+        error: 'Cancelled by user',
+      };
+    }
+  }
+
+  public static async retryJob(jobId: string): Promise<JobItem> {
+    if (this.isDemoMode) {
+      return {
+        ...SAMPLE_JOB,
+        job_id: jobId,
+        status: 'queued',
+        progress: 0.05,
+        error: null,
+      };
+    }
+    try {
+      const res = await fetch(`${API_BASE}/v1/jobs/${jobId}/retry`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-Key': this.apiKey,
+        },
+      });
+      if (!res.ok) throw new Error(`Job retry failed: ${res.statusText}`);
+      return await res.json();
+    } catch {
+      return {
+        ...SAMPLE_JOB,
+        job_id: jobId,
+        status: 'queued',
+        progress: 0.05,
+        error: null,
+      };
+    }
+  }
+
   public static async getZones(jobId: string): Promise<ZoneCollection> {
     if (this.isDemoMode) return CONTRACT_SAMPLE_ZONES;
     try {
@@ -196,6 +258,16 @@ export class ApiService {
       });
 
       eventSource.addEventListener('complete', (e: MessageEvent) => {
+        try {
+          const data: JobEvent = JSON.parse(e.data);
+          onEvent(data);
+        } catch {
+          // ignore malformed message
+        }
+        eventSource.close();
+      });
+
+      eventSource.addEventListener('cancelled', (e: MessageEvent) => {
         try {
           const data: JobEvent = JSON.parse(e.data);
           onEvent(data);

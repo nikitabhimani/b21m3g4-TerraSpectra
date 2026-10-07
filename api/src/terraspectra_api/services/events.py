@@ -103,6 +103,9 @@ async def stream_job_events(
             if job.status == JobState.FAILED:
                 yield format_sse("error", initial_data)
                 return
+            if job.status == JobState.CANCELLED:
+                yield format_sse("cancelled", initial_data)
+                return
 
             # Yield initial status
             yield format_sse("progress", initial_data)
@@ -113,7 +116,7 @@ async def stream_job_events(
             try:
                 event_type, event_data = await asyncio.wait_for(queue.get(), timeout=poll_interval)
                 yield format_sse(event_type, event_data)
-                if event_type in ("complete", "error"):
+                if event_type in ("complete", "error", "cancelled"):
                     return
                 last_ping = time.monotonic()
                 continue
@@ -148,6 +151,9 @@ async def stream_job_events(
                         return
                     if job.status == JobState.FAILED:
                         yield format_sse("error", data)
+                        return
+                    if job.status == JobState.CANCELLED:
+                        yield format_sse("cancelled", data)
                         return
                     yield format_sse("progress", data)
                     last_ping = time.monotonic()

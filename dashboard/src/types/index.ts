@@ -72,7 +72,7 @@ export interface JobItem {
   job_id: string;
   scene_id: string;
   field_id?: string | null;
-  status: 'queued' | 'running' | 'succeeded' | 'failed';
+  status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
   progress: number;
   created_at: string;
   updated_at: string;
@@ -82,7 +82,7 @@ export interface JobItem {
 
 export interface JobEvent {
   job_id: string;
-  status: 'queued' | 'running' | 'succeeded' | 'failed';
+  status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
   progress: number;
   step?: string;
   summary?: JobSummary | null;
