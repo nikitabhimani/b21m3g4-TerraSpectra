@@ -56,6 +56,8 @@ class Settings(BaseSettings):
     zone_min_acres: float = Field(default=1.0, ge=0.0)
     zone_simplify_px: float = Field(default=0.5, ge=0.0)
     tile_cache_size: int = Field(default=1024, ge=0)
+    tile_redis_cache: bool = True
+    tile_cache_ttl: int = Field(default=86400, ge=60)
     prefetch_batches: int = Field(default=2, ge=0)
 
     @field_validator("api_keys", "cors_origins", "uri_allowed_roots", mode="before")

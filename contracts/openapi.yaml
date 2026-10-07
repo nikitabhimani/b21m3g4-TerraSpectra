@@ -104,6 +104,17 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Job" }
         "404": { $ref: "#/components/responses/Error" }
+  /v1/jobs/{job_id}/stream:
+    get:
+      operationId: streamJobEvents
+      parameters: [{ $ref: "#/components/parameters/JobId" }]
+      responses:
+        "200":
+          description: Server-Sent Events stream for live job progress and status
+          content:
+            text/event-stream:
+              schema: { type: string }
+        "404": { $ref: "#/components/responses/Error" }
   /v1/jobs/{job_id}/zones:
     get:
       operationId: getJobZones

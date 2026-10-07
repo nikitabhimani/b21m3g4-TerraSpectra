@@ -4,7 +4,7 @@ import {
   SAMPLE_JOB,
   SAMPLE_SCENES,
 } from '../fixtures/mockData';
-import { FieldItem, JobItem, SceneItem, ZoneCollection } from '../types';
+import { FieldItem, JobEvent, JobItem, SceneItem, ZoneCollection } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
@@ -143,4 +143,80 @@ export class ApiService {
   public static getRiskDownloadUrl(jobId: string): string {
     return `${API_BASE}/v1/jobs/${jobId}/risk.tif`;
   }
+
+  public static subscribeJobEvents(
+    jobId: string,
+    onEvent: (evt: JobEvent) => void,
+    onError?: (err: unknown) => void
+  ): () => void {
+    if (this.isDemoMode || jobId.startsWith('job_mock_') || typeof EventSource === 'undefined') {
+      let isCancelled = false;
+      const demoSteps = [
+        { progress: 0.1, step: 'Validating Contract C1 200-band hyperspectral cube & CRS metadata...' },
+        { progress: 0.35, step: 'Windowing raster into 64x64 patches & pre-fetching...' },
+        { progress: 0.65, step: 'Executing 3D-CNN + ViT hybrid inference on GPU (models/model.pt)...' },
+        { progress: 0.88, step: 'Stitching Hann-window blended risk rasters & writing COG...' },
+        { progress: 0.98, step: 'Vectorizing epidemiological polygons & computing ROI...' },
+        { progress: 1.0, step: 'Scan complete. All layers generated.' },
+      ];
+
+      (async () => {
+        for (let i = 0; i < demoSteps.length; i++) {
+          if (isCancelled) return;
+          await new Promise((r) => setTimeout(r, 600));
+          if (isCancelled) return;
+          const s = demoSteps[i];
+          const isDone = i === demoSteps.length - 1;
+          onEvent({
+            job_id: jobId,
+            status: isDone ? 'succeeded' : 'running',
+            progress: s.progress,
+            step: s.step,
+            summary: isDone ? SAMPLE_JOB.summary : null,
+          });
+        }
+      })();
+
+      return () => {
+        isCancelled = true;
+      };
+    }
+
+    try {
+      const sseUrl = `${API_BASE}/v1/jobs/${jobId}/stream?api_key=${this.apiKey}`;
+      const eventSource = new EventSource(sseUrl);
+
+      eventSource.addEventListener('progress', (e: MessageEvent) => {
+        try {
+          const data: JobEvent = JSON.parse(e.data);
+          onEvent(data);
+        } catch {
+          // ignore malformed message
+        }
+      });
+
+      eventSource.addEventListener('complete', (e: MessageEvent) => {
+        try {
+          const data: JobEvent = JSON.parse(e.data);
+          onEvent(data);
+        } catch {
+          // ignore malformed message
+        }
+        eventSource.close();
+      });
+
+      eventSource.addEventListener('error', (e: Event) => {
+        if (onError) onError(e);
+        eventSource.close();
+      });
+
+      return () => {
+        eventSource.close();
+      };
+    } catch (err) {
+      if (onError) onError(err);
+      return () => {};
+    }
+  }
 }
+

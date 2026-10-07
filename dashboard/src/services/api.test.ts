@@ -124,4 +124,36 @@ describe('ApiService Client & Contract C4 Compliance', () => {
       expect(riskUrl).toContain('/v1/jobs/job_xyz_123/risk.tif');
     });
   });
+
+  describe('Real-Time SSE Job Events Streaming', () => {
+    it('streams job progress events in demo mode', async () => {
+      ApiService.setDemoMode(true);
+      const events: any[] = [];
+      const unsubscribe = ApiService.subscribeJobEvents('job_test_stream', (evt) => {
+        events.push(evt);
+      });
+
+      // Wait for at least 2 events to fire
+      await new Promise((r) => setTimeout(r, 1300));
+      unsubscribe();
+
+      expect(events.length).toBeGreaterThanOrEqual(1);
+      expect(events[0].job_id).toBe('job_test_stream');
+      expect(events[0].progress).toBeGreaterThan(0);
+      expect(events[0].step).toBeDefined();
+    });
+
+    it('supports immediate cancellation via unsubscribe callback', async () => {
+      ApiService.setDemoMode(true);
+      const events: any[] = [];
+      const unsubscribe = ApiService.subscribeJobEvents('job_cancel_stream', (evt) => {
+        events.push(evt);
+      });
+      // Cancel immediately
+      unsubscribe();
+
+      await new Promise((r) => setTimeout(r, 800));
+      expect(events.length).toBe(0);
+    });
+  });
 });

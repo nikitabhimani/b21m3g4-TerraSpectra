@@ -2,15 +2,20 @@
 
 from __future__ import annotations
 
+import hashlib
+import logging
 import threading
 from collections import OrderedDict
 from functools import cache
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 from rio_tiler.errors import TileOutsideBounds
 from rio_tiler.io import Reader
 from rio_tiler.utils import render
+
+log = logging.getLogger(__name__)
 
 TILE_SIZE = 256
 ALPHA = 210
@@ -35,28 +40,62 @@ def transparent_tile() -> bytes:
 
 
 class TileRenderer:
-    """Renders and LRU-caches tiles keyed by ``(path, mtime, z, x, y)``.
+    """Renders and dual-caches tiles (in-memory LRU + shared Redis cache)."""
 
-    TODO(Day 9): shared cache (Redis) / CDN in front for multi-replica deployments.
-    """
-
-    def __init__(self, cache_size: int = 1024) -> None:
+    def __init__(
+        self,
+        cache_size: int = 1024,
+        redis_client: Any | None = None,
+        redis_ttl: int = 86400,
+    ) -> None:
         self.cache_size = cache_size
         self._cache: OrderedDict[tuple[str, int, int, int, int], bytes] = OrderedDict()
         self._lock = threading.Lock()
+        self.redis = redis_client
+        self.redis_ttl = redis_ttl
 
     def render(self, path: Path, z: int, x: int, y: int) -> bytes:
-        key = (str(path), path.stat().st_mtime_ns, z, x, y)
+        mtime = path.stat().st_mtime_ns
+        key = (str(path), mtime, z, x, y)
+
+        # 1. Check in-memory LRU cache
         with self._lock:
             if key in self._cache:
                 self._cache.move_to_end(key)
                 return self._cache[key]
+
+        # 2. Check Redis cache if available
+        path_hash = hashlib.sha256(str(path).encode()).hexdigest()[:16]
+        redis_key = f"ts:tile:{path_hash}:{mtime}:{z}:{x}:{y}"
+        if self.redis is not None:
+            try:
+                cached = self.redis.get(redis_key)
+                if cached is not None:
+                    with self._lock:
+                        self._cache[key] = cached
+                        while len(self._cache) > self.cache_size:
+                            self._cache.popitem(last=False)
+                    return cached
+            except Exception as exc:
+                log.debug("Redis tile cache get error: %s", exc)
+
+        # 3. Render raster tile
         data = self._render(path, z, x, y)
+
+        # 4. Save to in-memory LRU cache
         if self.cache_size > 0:
             with self._lock:
                 self._cache[key] = data
                 while len(self._cache) > self.cache_size:
                     self._cache.popitem(last=False)
+
+        # 5. Save to Redis cache
+        if self.redis is not None:
+            try:
+                self.redis.set(redis_key, data, ex=self.redis_ttl)
+            except Exception as exc:
+                log.debug("Redis tile cache set error: %s", exc)
+
         return data
 
     @staticmethod

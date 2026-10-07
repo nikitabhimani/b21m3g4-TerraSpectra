@@ -33,3 +33,7 @@ def get_queue(request: Request) -> JobQueue:
 def get_tiles(request: Request) -> TileRenderer:
     tiles: TileRenderer = request.app.state.tiles
     return tiles
+
+
+def get_redis(request: Request) -> object | None:
+    return getattr(request.app.state, "redis", None)

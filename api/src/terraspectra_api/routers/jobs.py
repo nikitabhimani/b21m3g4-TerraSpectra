@@ -5,18 +5,19 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Query
-from fastapi.responses import FileResponse, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from shapely.errors import GEOSException
 from shapely.geometry import shape
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from terraspectra_api.db import get_session
-from terraspectra_api.deps import get_queue, get_settings_dep
+from terraspectra_api.deps import get_queue, get_redis, get_settings_dep
 from terraspectra_api.errors import ApiError, not_found
 from terraspectra_api.models import Job, Scene, as_utc, new_id
 from terraspectra_api.schemas import ERROR_RESPONSES
+from terraspectra_api.services.events import stream_job_events
 from terraspectra_api.services.fields import load_fields
 from terraspectra_api.services.queue import JobQueue
 from terraspectra_api.settings import Settings
@@ -168,3 +169,36 @@ def get_job_risk_raster(job_id: str, session: Session = Depends(get_session)) ->
     job = get_job_or_404(session, job_id)
     path = require_succeeded(job, job.risk_path)
     return FileResponse(path, media_type="image/tiff", filename=f"{job_id}_risk.tif")
+
+
+@router.get(
+    "/jobs/{job_id}/stream",
+    operation_id="streamJobEvents",
+    response_class=StreamingResponse,
+    responses={
+        200: {
+            "content": {"text/event-stream": {}},
+            "description": "Server-Sent Events stream for live job progress and status",
+        },
+        404: ERROR_RESPONSES[404],
+    },
+)
+async def stream_job_events_endpoint(
+    job_id: str,
+    request: Request,
+    session: Session = Depends(get_session),
+    redis: object | None = Depends(get_redis),
+) -> StreamingResponse:
+    """Stream live Server-Sent Events (progress, step, and status transitions) for a job."""
+    get_job_or_404(session, job_id)
+    db = request.app.state.db
+
+    return StreamingResponse(
+        stream_job_events(job_id=job_id, db=db, redis_client=redis),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )

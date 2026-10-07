@@ -85,7 +85,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.storage = build_storage(settings.storage_dir, settings.allowed_roots)
     app.state.db = Database(settings.database_url)
-    app.state.tiles = TileRenderer(settings.tile_cache_size)
+    redis_client = None
+    if settings.redis_url and settings.tile_redis_cache:
+        try:
+            from redis import Redis
+
+            rc = Redis.from_url(settings.redis_url, socket_connect_timeout=0.5)
+            rc.ping()
+            redis_client = rc
+            log.info("redis connected for tile caching and event streaming")
+        except Exception:
+            redis_client = None
+
+    app.state.redis = redis_client
+    app.state.tiles = TileRenderer(
+        cache_size=settings.tile_cache_size,
+        redis_client=redis_client,
+        redis_ttl=settings.tile_cache_ttl,
+    )
     app.state.rate_limiter = RateLimiter(settings.rate_limit)
     app.state.engine = None
 
