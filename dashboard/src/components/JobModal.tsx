@@ -1,13 +1,16 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { 
+  AlertTriangle,
   CheckCircle2, 
   Cpu, 
   FileText, 
   Loader2, 
   Play, 
+  RotateCw,
   Satellite, 
   Sparkles, 
-  X 
+  X,
+  XCircle
 } from 'lucide-react';
 import { FieldItem, SceneItem } from '../types';
 import { ApiService } from '../services/api';
@@ -30,15 +33,21 @@ export const JobModal: React.FC<JobModalProps> = ({
   const [selectedScene, setSelectedScene] = useState<string>(scenes[0]?.scene_id || '');
   const [selectedField, setSelectedField] = useState<string>(fields[0]?.id || '');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [jobStatus, setJobStatus] = useState<'idle' | 'running' | 'succeeded' | 'failed' | 'cancelled'>('idle');
+  const [currentJobId, setCurrentJobId] = useState<string | null>(null);
   const [progressPercent, setProgressPercent] = useState<number>(0);
   const [activeStepText, setActiveStepText] = useState<string>('');
   const [isStreamActive, setIsStreamActive] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const unsubscribeRef = useRef<(() => void) | null>(null);
 
   if (!isOpen) return null;
 
   const handleStartScan = async () => {
     setIsProcessing(true);
+    setIsCancelling(false);
+    setJobStatus('running');
     setProgressPercent(5);
     setActiveStepText('Connecting to inference queue & initializing pipeline...');
     setIsStreamActive(true);
@@ -47,9 +56,14 @@ export const JobModal: React.FC<JobModalProps> = ({
     try {
       // 1. Create or register inference job
       const job = await ApiService.createJob(selectedScene, selectedField);
+      setCurrentJobId(job.job_id);
 
       // 2. Subscribe to real-time Server-Sent Events (SSE)
-      const unsubscribe = ApiService.subscribeJobEvents(
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+      }
+
+      unsubscribeRef.current = ApiService.subscribeJobEvents(
         job.job_id,
         (evt) => {
           if (evt.step) {
@@ -59,6 +73,7 @@ export const JobModal: React.FC<JobModalProps> = ({
             setProgressPercent(Math.min(100, Math.max(5, Math.round(evt.progress * 100))));
           }
           if (evt.status === 'succeeded') {
+            setJobStatus('succeeded');
             setProgressPercent(100);
             setActiveStepText('Inference complete! Loading risk zones and tiles...');
             setTimeout(() => {
@@ -70,7 +85,13 @@ export const JobModal: React.FC<JobModalProps> = ({
           } else if (evt.status === 'failed') {
             setIsProcessing(false);
             setIsStreamActive(false);
+            setJobStatus('failed');
             setErrorMessage(evt.error || 'Job failed during inference');
+          } else if (evt.status === 'cancelled') {
+            setIsProcessing(false);
+            setIsStreamActive(false);
+            setJobStatus('cancelled');
+            setActiveStepText('Inference cancelled by user');
           }
         },
         (err) => {
@@ -80,7 +101,93 @@ export const JobModal: React.FC<JobModalProps> = ({
     } catch (err: unknown) {
       setIsProcessing(false);
       setIsStreamActive(false);
+      setJobStatus('failed');
       setErrorMessage(err instanceof Error ? err.message : 'Failed to launch scan');
+    }
+  };
+
+  const handleCancelScan = async () => {
+    if (!currentJobId && !isProcessing) return;
+    setIsCancelling(true);
+    setActiveStepText('Aborting inference job and halting worker...');
+
+    try {
+      if (currentJobId) {
+        await ApiService.cancelJob(currentJobId);
+      }
+    } catch (err) {
+      console.warn('Failed to send cancel request to API:', err);
+    } finally {
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+        unsubscribeRef.current = null;
+      }
+      setIsProcessing(false);
+      setIsCancelling(false);
+      setIsStreamActive(false);
+      setJobStatus('cancelled');
+      setActiveStepText('Inference scan was cancelled by user');
+    }
+  };
+
+  const handleRetryScan = async () => {
+    if (currentJobId) {
+      setIsProcessing(true);
+      setIsCancelling(false);
+      setJobStatus('running');
+      setProgressPercent(5);
+      setActiveStepText('Re-queueing inference job and re-initializing pipeline...');
+      setIsStreamActive(true);
+      setErrorMessage(null);
+
+      try {
+        await ApiService.retryJob(currentJobId);
+
+        if (unsubscribeRef.current) {
+          unsubscribeRef.current();
+        }
+
+        unsubscribeRef.current = ApiService.subscribeJobEvents(
+          currentJobId,
+          (evt) => {
+            if (evt.step) {
+              setActiveStepText(evt.step);
+            }
+            if (typeof evt.progress === 'number') {
+              setProgressPercent(Math.min(100, Math.max(5, Math.round(evt.progress * 100))));
+            }
+            if (evt.status === 'succeeded') {
+              setJobStatus('succeeded');
+              setProgressPercent(100);
+              setActiveStepText('Inference complete! Loading risk zones and tiles...');
+              setTimeout(() => {
+                setIsProcessing(false);
+                setIsStreamActive(false);
+                onJobComplete(currentJobId);
+                onClose();
+              }, 600);
+            } else if (evt.status === 'failed') {
+              setIsProcessing(false);
+              setIsStreamActive(false);
+              setJobStatus('failed');
+              setErrorMessage(evt.error || 'Job failed during inference');
+            } else if (evt.status === 'cancelled') {
+              setIsProcessing(false);
+              setIsStreamActive(false);
+              setJobStatus('cancelled');
+              setActiveStepText('Inference cancelled by user');
+            }
+          },
+          (err) => {
+            console.warn('SSE subscription error:', err);
+          }
+        );
+      } catch {
+        // Fall back to fresh job creation if retry endpoint fails
+        handleStartScan();
+      }
+    } else {
+      handleStartScan();
     }
   };
 
@@ -186,39 +293,103 @@ export const JobModal: React.FC<JobModalProps> = ({
             </div>
           )}
 
-          {errorMessage && (
-            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs">
-              {errorMessage}
+          {/* Cancelled Banner */}
+          {jobStatus === 'cancelled' && (
+            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>Inference scan was cancelled. Execution halted.</span>
+              </div>
+              <button
+                onClick={handleRetryScan}
+                className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-semibold text-[11px] flex items-center gap-1 transition-colors"
+              >
+                <RotateCw className="w-3 h-3" />
+                Retry
+              </button>
+            </div>
+          )}
+
+          {/* Error Banner */}
+          {(errorMessage || jobStatus === 'failed') && (
+            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <XCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                <span>{errorMessage || 'Inference job failed.'}</span>
+              </div>
+              <button
+                onClick={handleRetryScan}
+                className="px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 font-semibold text-[11px] flex items-center gap-1 transition-colors"
+              >
+                <RotateCw className="w-3 h-3" />
+                Retry
+              </button>
             </div>
           )}
         </div>
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-slate-800 bg-slate-950/60 flex items-center justify-end gap-2.5">
-          <button
-            disabled={isProcessing}
-            onClick={onClose}
-            className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors disabled:opacity-40"
-          >
-            Cancel
-          </button>
-          <button
-            disabled={isProcessing}
-            onClick={handleStartScan}
-            className="px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/30 flex items-center gap-2 transition-all disabled:opacity-50"
-          >
-            {isProcessing ? (
-              <>
+          {isProcessing ? (
+            <>
+              <button
+                disabled={isCancelling}
+                onClick={handleCancelScan}
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 flex items-center gap-1.5 transition-colors disabled:opacity-50"
+              >
+                {isCancelling ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Aborting...</span>
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="w-3.5 h-3.5" />
+                    <span>Abort Scan</span>
+                  </>
+                )}
+              </button>
+              <button
+                disabled
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-600/50 text-white/80 shadow-lg flex items-center gap-2 cursor-not-allowed"
+              >
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 <span>Running Scan...</span>
-              </>
-            ) : (
-              <>
+              </button>
+            </>
+          ) : jobStatus === 'cancelled' || jobStatus === 'failed' ? (
+            <>
+              <button
+                onClick={onClose}
+                className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+              >
+                Dismiss
+              </button>
+              <button
+                onClick={handleRetryScan}
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-amber-600 hover:bg-amber-500 text-white shadow-lg shadow-amber-600/30 flex items-center gap-2 transition-all"
+              >
+                <RotateCw className="w-3.5 h-3.5" />
+                <span>Retry Inference</span>
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={onClose}
+                className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleStartScan}
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/30 flex items-center gap-2 transition-all"
+              >
                 <Play className="w-3.5 h-3.5" />
                 <span>Run Inference</span>
-              </>
-            )}
-          </button>
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

@@ -244,3 +244,57 @@ def test_stream_job_events(client: TestClient, auth: dict[str, str], cube_path: 
     # 3. Nonexistent job stream returns 404
     missing_resp = client.get("/v1/jobs/job_nonexistent_99/stream", headers=auth)
     assert missing_resp.status_code == 404
+
+
+def test_job_cancel_and_retry_lifecycle(
+    client: TestClient, auth: dict[str, str], cube_path: Path
+) -> None:
+    from terraspectra_api.models import Job
+
+    # 1. Register a scene and enqueue job (runs inline in testclient to succeeded)
+    scene = _upload(client, auth, cube_path)
+    job_resp = client.post("/v1/jobs", json={"scene_id": scene["scene_id"]}, headers=auth)
+    assert job_resp.status_code == 202
+    job_id = job_resp.json()["job_id"]
+
+    # Succeeded job cannot be cancelled or retried
+    assert client.post(f"/v1/jobs/{job_id}/cancel", headers=auth).status_code == 409
+    assert client.post(f"/v1/jobs/{job_id}/retry", headers=auth).status_code == 409
+
+    # 2. Insert a queued job directly into DB to test cancellation
+    db = client.app.state.db  # type: ignore[attr-defined]
+    test_cancel_id = "job_test_cancel_99"
+    with db.session() as s:
+        s.add(Job(id=test_cancel_id, scene_id=scene["scene_id"], status="queued", progress=0.0))
+        s.commit()
+
+    # 3. Cancel the queued job
+    cancel_resp = client.post(f"/v1/jobs/{test_cancel_id}/cancel", headers=auth)
+    assert cancel_resp.status_code == 200
+    assert cancel_resp.json()["status"] == "cancelled"
+    assert "Cancelled by user" in cancel_resp.json()["error"]
+
+    # 4. Cancelling again is idempotent
+    cancel_idempotent = client.post(f"/v1/jobs/{test_cancel_id}/cancel", headers=auth)
+    assert cancel_idempotent.status_code == 200
+    assert cancel_idempotent.json()["status"] == "cancelled"
+
+    # 5. SSE stream reflects cancelled state
+    api_key = auth["X-API-Key"]
+    stream_resp = client.get(f"/v1/jobs/{test_cancel_id}/stream?api_key={api_key}")
+    assert stream_resp.status_code == 200
+    assert "event: cancelled" in stream_resp.text
+
+    # 6. Retry the cancelled job (runs inline in background tasks and succeeds)
+    retry_resp = client.post(f"/v1/jobs/{test_cancel_id}/retry", headers=auth)
+    assert retry_resp.status_code == 202
+    assert retry_resp.json()["status"] == "queued"
+
+    # Verify background execution ran to completion
+    completed_job = client.get(f"/v1/jobs/{test_cancel_id}", headers=auth).json()
+    assert completed_job["status"] == "succeeded"
+
+    # 7. Non-existent job cancel and retry return 404
+    assert client.post("/v1/jobs/job_nonexistent_88/cancel", headers=auth).status_code == 404
+    assert client.post("/v1/jobs/job_nonexistent_88/retry", headers=auth).status_code == 404
+

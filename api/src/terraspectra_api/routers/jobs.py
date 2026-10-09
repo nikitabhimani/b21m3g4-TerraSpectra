@@ -15,10 +15,11 @@ from sqlalchemy.orm import Session
 from terraspectra_api.db import get_session
 from terraspectra_api.deps import get_queue, get_redis, get_settings_dep
 from terraspectra_api.errors import ApiError, not_found
-from terraspectra_api.models import Job, Scene, as_utc, new_id
+from terraspectra_api.models import Job, Scene, as_utc, new_id, utcnow
 from terraspectra_api.schemas import ERROR_RESPONSES
-from terraspectra_api.services.events import stream_job_events
+from terraspectra_api.services.events import publish_job_event, stream_job_events
 from terraspectra_api.services.fields import load_fields
+from terraspectra_api.services.jobs import mark_job_cancelled, unmark_job_cancelled
 from terraspectra_api.services.queue import JobQueue
 from terraspectra_api.settings import Settings
 from terraspectra_contracts import JobCreate, JobStatus, JobSummary, ZoneFeatureCollection
@@ -202,3 +203,104 @@ async def stream_job_events_endpoint(
             "X-Accel-Buffering": "no",
         },
     )
+
+
+@router.post(
+    "/jobs/{job_id}/cancel",
+    operation_id="cancelJob",
+    response_model=JobStatus,
+    responses={
+        404: ERROR_RESPONSES[404],
+        409: ERROR_RESPONSES[409],
+    },
+)
+def cancel_job(
+    job_id: str,
+    session: Session = Depends(get_session),
+    redis: object | None = Depends(get_redis),
+) -> JobStatus:
+    """Cancel a queued or running inference job."""
+    job = get_job_or_404(session, job_id)
+    if job.status == JobState.SUCCEEDED:
+        raise ApiError(409, "cannot cancel succeeded job", "job_already_finished")
+    if job.status == JobState.FAILED:
+        raise ApiError(409, "cannot cancel failed job", "job_already_finished")
+    if job.status == JobState.CANCELLED:
+        return to_status(job)
+
+    job.status = JobState.CANCELLED
+    job.error = "Cancelled by user"
+    job.finished_at = utcnow()
+    session.commit()
+
+    mark_job_cancelled(job.id, redis)
+    publish_job_event(
+        job.id,
+        "cancelled",
+        {
+            "job_id": job.id,
+            "status": "cancelled",
+            "progress": job.progress,
+            "step": "Job cancelled by user",
+            "timestamp": utcnow().isoformat(),
+        },
+        redis,
+    )
+    return to_status(job)
+
+
+@router.post(
+    "/jobs/{job_id}/retry",
+    operation_id="retryJob",
+    status_code=202,
+    response_model=JobStatus,
+    responses={
+        404: ERROR_RESPONSES[404],
+        409: ERROR_RESPONSES[409],
+    },
+)
+def retry_job(
+    job_id: str,
+    background: BackgroundTasks,
+    session: Session = Depends(get_session),
+    queue: JobQueue = Depends(get_queue),
+    redis: object | None = Depends(get_redis),
+) -> JobStatus:
+    """Retry a failed or cancelled inference job."""
+    job = get_job_or_404(session, job_id)
+    if job.status not in (JobState.FAILED, JobState.CANCELLED):
+        raise ApiError(409, f"cannot retry job in {job.status} state", "job_cannot_retry")
+
+    unmark_job_cancelled(job.id, redis)
+    job.status = JobState.QUEUED
+    job.progress = 0.0
+    job.error = None
+    job.summary = None
+    job.started_at = None
+    job.finished_at = None
+    job.risk_path = None
+    job.zones_path = None
+    session.commit()
+
+    try:
+        queue.enqueue(job.id, background)
+    except Exception as exc:
+        log.exception("retry enqueue failed", extra={"job_id": job.id})
+        job.status, job.error = JobState.FAILED, f"enqueue failed: {exc}"
+        session.commit()
+        raise ApiError(503, "job queue unavailable", "queue_unavailable") from exc
+
+    publish_job_event(
+        job.id,
+        "progress",
+        {
+            "job_id": job.id,
+            "status": "queued",
+            "progress": 0.0,
+            "step": "Job re-queued for execution",
+            "timestamp": utcnow().isoformat(),
+        },
+        redis,
+    )
+    return to_status(job)
+

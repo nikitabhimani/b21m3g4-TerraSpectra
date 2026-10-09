@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
+import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -28,6 +30,40 @@ from terraspectra_contracts import WINDOW_SIZE
 from terraspectra_contracts.schemas import JobState
 
 log = logging.getLogger(__name__)
+
+_cancelled_jobs: set[str] = set()
+_cancel_lock = threading.Lock()
+
+
+class JobCancelledError(Exception):
+    """Raised when job execution is interrupted by a user cancellation."""
+
+
+def mark_job_cancelled(job_id: str, redis_client: Any | None = None) -> None:
+    with _cancel_lock:
+        _cancelled_jobs.add(job_id)
+    if redis_client is not None:
+        with contextlib.suppress(Exception):
+            redis_client.set(f"ts:job:cancel:{job_id}", "1", ex=3600)
+
+
+def unmark_job_cancelled(job_id: str, redis_client: Any | None = None) -> None:
+    with _cancel_lock:
+        _cancelled_jobs.discard(job_id)
+    if redis_client is not None:
+        with contextlib.suppress(Exception):
+            redis_client.delete(f"ts:job:cancel:{job_id}")
+
+
+def is_job_cancelled(job_id: str, redis_client: Any | None = None) -> bool:
+    with _cancel_lock:
+        if job_id in _cancelled_jobs:
+            return True
+    if redis_client is not None:
+        with contextlib.suppress(Exception):
+            if redis_client.get(f"ts:job:cancel:{job_id}"):
+                return True
+    return False
 
 
 @dataclass
@@ -169,6 +205,9 @@ def run_job(job_id: str, ctx: JobContext | None = None) -> None:
             if job is None:
                 log.error("job not found", extra={"job_id": job_id})
                 return
+            if job.status == JobState.CANCELLED or is_job_cancelled(job_id, ctx.redis):
+                log.info("job cancelled prior to run; skipping", extra={"job_id": job_id})
+                return
             if job.status != JobState.QUEUED:
                 log.warning("job not queued; skipping", extra={"job_id": job_id})
                 return
@@ -182,7 +221,31 @@ def run_job(job_id: str, ctx: JobContext | None = None) -> None:
             "job succeeded",
             extra={"job_id": job_id, "seconds": round(time.perf_counter() - started, 2)},
         )
+    except JobCancelledError:
+        log.info("job cancelled gracefully", extra={"job_id": job_id})
+        with contextlib.suppress(Exception):
+            _update(
+                ctx.db,
+                job_id,
+                status=JobState.CANCELLED,
+                error="Cancelled by user",
+                finished_at=utcnow(),
+            )
+            publish_job_event(
+                job_id,
+                "cancelled",
+                {
+                    "job_id": job_id,
+                    "status": "cancelled",
+                    "step": "Inference cancelled by user",
+                    "timestamp": utcnow().isoformat(),
+                },
+                ctx.redis,
+            )
     except Exception as exc:
+        if is_job_cancelled(job_id, ctx.redis):
+            log.info("job cancelled during execution failure handler", extra={"job_id": job_id})
+            return
         log.exception("job failed", extra={"job_id": job_id})
         err_msg = f"{type(exc).__name__}: {exc}"[:2000]
         try:
@@ -230,6 +293,9 @@ def _execute(
         height, width = src.height, src.width
         aoi_mask = _aoi_mask(aoi, src) if aoi else None
 
+    if is_job_cancelled(job_id, ctx.redis):
+        raise JobCancelledError(f"job {job_id} cancelled")
+
     chunker = RasterChunker(
         cube_path,
         window_size=WINDOW_SIZE,
@@ -245,6 +311,8 @@ def _execute(
     done = 0
     report(0.10, step=f"Chunking cube into {total} 64x64 patches", force=True)
     for batch in chunker.batches():
+        if is_job_cancelled(job_id, ctx.redis):
+            raise JobCancelledError(f"job {job_id} cancelled")
         probs, onset = engine.predict(batch.data)
         stitcher.add(probs, onset, batch.rows, batch.cols, batch.valid)
         done += len(batch)
@@ -252,6 +320,9 @@ def _execute(
             0.10 + 0.75 * done / total,
             step=f"Inferred {done}/{total} windows with 3D-CNN+ViT hybrid",
         )
+
+    if is_job_cancelled(job_id, ctx.redis):
+        raise JobCancelledError(f"job {job_id} cancelled")
 
     report(0.88, step="Stitching risk raster & writing 5-band Cloud-Optimized GeoTIFF", force=True)
     probs_full, onset_full, valid = stitcher.finalize(aoi_mask)
