@@ -9,6 +9,7 @@ import {
   RotateCw,
   Satellite, 
   Sparkles, 
+  Trash2,
   X,
   XCircle
 } from 'lucide-react';
@@ -34,6 +35,7 @@ export const JobModal: React.FC<JobModalProps> = ({
   const [selectedField, setSelectedField] = useState<string>(fields[0]?.id || '');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [jobStatus, setJobStatus] = useState<'idle' | 'running' | 'succeeded' | 'failed' | 'cancelled'>('idle');
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
   const [progressPercent, setProgressPercent] = useState<number>(0);
@@ -191,6 +193,33 @@ export const JobModal: React.FC<JobModalProps> = ({
     }
   };
 
+  const handleDeleteScan = async () => {
+    if (!currentJobId) {
+      setJobStatus('idle');
+      setErrorMessage(null);
+      setActiveStepText('');
+      setProgressPercent(0);
+      return;
+    }
+    setIsDeleting(true);
+    try {
+      await ApiService.deleteJob(currentJobId);
+    } catch (err) {
+      console.warn('Failed to delete job:', err);
+    } finally {
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+        unsubscribeRef.current = null;
+      }
+      setIsDeleting(false);
+      setCurrentJobId(null);
+      setJobStatus('idle');
+      setErrorMessage(null);
+      setActiveStepText('');
+      setProgressPercent(0);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in select-none">
       <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
@@ -300,13 +329,24 @@ export const JobModal: React.FC<JobModalProps> = ({
                 <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
                 <span>Inference scan was cancelled. Execution halted.</span>
               </div>
-              <button
-                onClick={handleRetryScan}
-                className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-semibold text-[11px] flex items-center gap-1 transition-colors"
-              >
-                <RotateCw className="w-3 h-3" />
-                Retry
-              </button>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  disabled={isDeleting}
+                  onClick={handleDeleteScan}
+                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-[11px] flex items-center gap-1 transition-colors"
+                  title="Discard cancelled scan"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  Discard
+                </button>
+                <button
+                  onClick={handleRetryScan}
+                  className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-semibold text-[11px] flex items-center gap-1 transition-colors"
+                >
+                  <RotateCw className="w-3 h-3" />
+                  Retry
+                </button>
+              </div>
             </div>
           )}
 
@@ -317,13 +357,24 @@ export const JobModal: React.FC<JobModalProps> = ({
                 <XCircle className="w-4 h-4 text-rose-400 shrink-0" />
                 <span>{errorMessage || 'Inference job failed.'}</span>
               </div>
-              <button
-                onClick={handleRetryScan}
-                className="px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 font-semibold text-[11px] flex items-center gap-1 transition-colors"
-              >
-                <RotateCw className="w-3 h-3" />
-                Retry
-              </button>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  disabled={isDeleting}
+                  onClick={handleDeleteScan}
+                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-[11px] flex items-center gap-1 transition-colors"
+                  title="Discard failed scan"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  Discard
+                </button>
+                <button
+                  onClick={handleRetryScan}
+                  className="px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 font-semibold text-[11px] flex items-center gap-1 transition-colors"
+                >
+                  <RotateCw className="w-3 h-3" />
+                  Retry
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -359,6 +410,14 @@ export const JobModal: React.FC<JobModalProps> = ({
             </>
           ) : jobStatus === 'cancelled' || jobStatus === 'failed' ? (
             <>
+              <button
+                disabled={isDeleting}
+                onClick={handleDeleteScan}
+                className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-rose-300 hover:bg-slate-800 flex items-center gap-1.5 transition-colors disabled:opacity-50"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Discard Run</span>
+              </button>
               <button
                 onClick={onClose}
                 className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"

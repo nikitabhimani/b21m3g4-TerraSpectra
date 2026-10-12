@@ -103,6 +103,37 @@ export class ApiService {
     }
   }
 
+  public static async listJobs(filters?: {
+    status?: string;
+    sceneId?: string;
+    fieldId?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<JobItem[]> {
+    if (this.isDemoMode) {
+      return [SAMPLE_JOB];
+    }
+    try {
+      const params = new URLSearchParams();
+      if (filters?.status) params.append('status', filters.status);
+      if (filters?.sceneId) params.append('scene_id', filters.sceneId);
+      if (filters?.fieldId) params.append('field_id', filters.fieldId);
+      if (typeof filters?.limit === 'number') params.append('limit', filters.limit.toString());
+      if (typeof filters?.offset === 'number') params.append('offset', filters.offset.toString());
+
+      const qs = params.toString() ? `?${params.toString()}` : '';
+      const res = await fetch(`${API_BASE}/v1/jobs${qs}`, {
+        headers: { 'X-API-Key': this.apiKey },
+        signal: AbortSignal.timeout(3000),
+      });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      return Array.isArray(data) ? data : [SAMPLE_JOB];
+    } catch {
+      return [SAMPLE_JOB];
+    }
+  }
+
   public static async getJob(jobId: string): Promise<JobItem> {
     if (this.isDemoMode || jobId.startsWith('job_')) {
       return {
@@ -120,6 +151,25 @@ export class ApiService {
       return await res.json();
     } catch {
       return { ...SAMPLE_JOB, job_id: jobId, status: 'succeeded', progress: 1.0 };
+    }
+  }
+
+  public static async deleteJob(jobId: string): Promise<void> {
+    if (this.isDemoMode) {
+      return;
+    }
+    try {
+      const res = await fetch(`${API_BASE}/v1/jobs/${jobId}`, {
+        method: 'DELETE',
+        headers: {
+          'X-API-Key': this.apiKey,
+        },
+      });
+      if (!res.ok && res.status !== 404) {
+        throw new Error(`Job deletion failed: ${res.statusText}`);
+      }
+    } catch (err) {
+      console.warn('Failed to delete job:', err);
     }
   }
 

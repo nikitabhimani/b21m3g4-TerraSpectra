@@ -218,4 +218,56 @@ describe('ApiService Client & Contract C4 Compliance', () => {
       );
     });
   });
+
+  describe('Job Deletion & Query Filtering', () => {
+    it('deletes a job successfully via DELETE endpoint', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 204,
+      });
+
+      await expect(ApiService.deleteJob('job_delete_1')).resolves.not.toThrow();
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/v1/jobs/job_delete_1'),
+        expect.objectContaining({ method: 'DELETE' })
+      );
+    });
+
+    it('handles job deletion gracefully in demo mode', async () => {
+      ApiService.setDemoMode(true);
+      await expect(ApiService.deleteJob('job_demo_del')).resolves.not.toThrow();
+    });
+
+    it('lists jobs with optional query filters', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => [
+          {
+            job_id: 'job_filtered_1',
+            scene_id: 'scn_1',
+            status: 'succeeded',
+            progress: 1.0,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ],
+      });
+
+      const jobs = await ApiService.listJobs({ status: 'succeeded', sceneId: 'scn_1' });
+      expect(jobs.length).toBe(1);
+      expect(jobs[0].status).toBe('succeeded');
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringMatching(/\/v1\/jobs\?.*status=succeeded.*scene_id=scn_1/),
+        expect.any(Object)
+      );
+    });
+
+    it('returns sample jobs when listing in demo mode', async () => {
+      ApiService.setDemoMode(true);
+      const jobs = await ApiService.listJobs();
+      expect(jobs.length).toBeGreaterThan(0);
+      expect(jobs[0].job_id).toBeDefined();
+    });
+  });
 });
+

@@ -71,6 +71,29 @@ paths:
   /v1/jobs:
     get:
       operationId: listJobs
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [queued, running, succeeded, failed, cancelled]
+        - name: scene_id
+          in: query
+          required: false
+          schema: { type: string }
+        - name: field_id
+          in: query
+          required: false
+          schema: { type: string }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, default: 100, minimum: 1, maximum: 1000 }
+        - name: offset
+          in: query
+          required: false
+          schema: { type: integer, default: 0, minimum: 0 }
       responses:
         "200":
           description: Jobs, newest first
@@ -104,6 +127,14 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Job" }
         "404": { $ref: "#/components/responses/Error" }
+    delete:
+      operationId: deleteJob
+      parameters: [{ $ref: "#/components/parameters/JobId" }]
+      responses:
+        "204":
+          description: Job deleted and artifacts purged
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
   /v1/jobs/{job_id}/stream:
     get:
       operationId: streamJobEvents

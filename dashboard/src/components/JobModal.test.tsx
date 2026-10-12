@@ -200,4 +200,58 @@ describe('JobModal Component', () => {
       expect(retryJobSpy).toHaveBeenCalledWith('job_test_retry_ui');
     });
   });
+
+  it('allows discarding/deleting a cancelled scan', async () => {
+    vi.spyOn(ApiService, 'createJob').mockResolvedValue({
+      job_id: 'job_test_del_ui',
+      scene_id: SAMPLE_SCENES[0].scene_id,
+      field_id: SAMPLE_FIELDS[0].id,
+      status: 'running',
+      progress: 0.2,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+
+    vi.spyOn(ApiService, 'cancelJob').mockResolvedValue({
+      job_id: 'job_test_del_ui',
+      scene_id: SAMPLE_SCENES[0].scene_id,
+      status: 'cancelled',
+      progress: 0.2,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      error: 'Cancelled by user',
+    });
+
+    const deleteJobSpy = vi.spyOn(ApiService, 'deleteJob').mockResolvedValue();
+
+    render(
+      <JobModal
+        isOpen={true}
+        onClose={vi.fn()}
+        scenes={SAMPLE_SCENES}
+        fields={SAMPLE_FIELDS}
+        onJobComplete={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByText('Run Inference'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Abort Scan')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Abort Scan'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Discard Run')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Discard Run'));
+
+    await waitFor(() => {
+      expect(deleteJobSpy).toHaveBeenCalledWith('job_test_del_ui');
+      expect(screen.getByText('Run Inference')).toBeInTheDocument();
+    });
+  });
 });
+

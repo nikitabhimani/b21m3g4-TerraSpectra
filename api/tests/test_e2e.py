@@ -298,3 +298,75 @@ def test_job_cancel_and_retry_lifecycle(
     assert client.post("/v1/jobs/job_nonexistent_88/cancel", headers=auth).status_code == 404
     assert client.post("/v1/jobs/job_nonexistent_88/retry", headers=auth).status_code == 404
 
+
+def test_job_filtering_and_deletion(
+    client: TestClient, auth: dict[str, str], cube_path: Path
+) -> None:
+    from terraspectra_api.models import Job
+
+    # 1. Register a scene and create two jobs (one succeeds, one cancelled)
+    scene = _upload(client, auth, cube_path)
+    job_resp1 = client.post("/v1/jobs", json={"scene_id": scene["scene_id"]}, headers=auth)
+    assert job_resp1.status_code == 202
+    job_id1 = job_resp1.json()["job_id"]
+
+    db = client.app.state.db  # type: ignore[attr-defined]
+    test_cancel_id = "job_test_del_filter_99"
+    with db.session() as s:
+        s.add(
+            Job(
+                id=test_cancel_id,
+                scene_id=scene["scene_id"],
+                field_id="fld_punjab_corn_01",
+                status="cancelled",
+                progress=0.0,
+            )
+        )
+        s.commit()
+
+    # 2. Test status filtering on list_jobs
+    succeeded_jobs = client.get("/v1/jobs?status=succeeded", headers=auth).json()
+    assert any(j["job_id"] == job_id1 for j in succeeded_jobs)
+    assert not any(j["job_id"] == test_cancel_id for j in succeeded_jobs)
+
+    cancelled_jobs = client.get("/v1/jobs?status=cancelled", headers=auth).json()
+    assert any(j["job_id"] == test_cancel_id for j in cancelled_jobs)
+    assert not any(j["job_id"] == job_id1 for j in cancelled_jobs)
+
+    # Test scene and field filters
+    scene_jobs = client.get(f"/v1/jobs?scene_id={scene['scene_id']}", headers=auth).json()
+    assert len(scene_jobs) >= 2
+
+    field_jobs = client.get("/v1/jobs?field_id=fld_punjab_corn_01", headers=auth).json()
+    assert any(j["job_id"] == test_cancel_id for j in field_jobs)
+
+    # 3. Cannot delete active (queued/running) job -> returns 409
+    test_running_id = "job_test_running_active"
+    with db.session() as s:
+        s.add(
+            Job(
+                id=test_running_id,
+                scene_id=scene["scene_id"],
+                status="running",
+                progress=0.5,
+            )
+        )
+        s.commit()
+    del_active_resp = client.delete(f"/v1/jobs/{test_running_id}", headers=auth)
+    assert del_active_resp.status_code == 409
+
+    # 4. Successfully delete completed job -> returns 204
+    job1_data = client.get(f"/v1/jobs/{job_id1}", headers=auth).json()
+    assert job1_data["status"] == "succeeded"
+    del_resp = client.delete(f"/v1/jobs/{job_id1}", headers=auth)
+    assert del_resp.status_code == 204
+
+    # Subsequent GET returns 404
+    assert client.get(f"/v1/jobs/{job_id1}", headers=auth).status_code == 404
+    # Subsequent DELETE returns 404
+    assert client.delete(f"/v1/jobs/{job_id1}", headers=auth).status_code == 404
+
+    # 5. Non-existent job DELETE returns 404
+    assert client.delete("/v1/jobs/job_ghost_404", headers=auth).status_code == 404
+
+

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 from pathlib import Path
 
@@ -13,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from terraspectra_api.db import get_session
-from terraspectra_api.deps import get_queue, get_redis, get_settings_dep
+from terraspectra_api.deps import get_queue, get_redis, get_settings_dep, get_storage
 from terraspectra_api.errors import ApiError, not_found
 from terraspectra_api.models import Job, Scene, as_utc, new_id, utcnow
 from terraspectra_api.schemas import ERROR_RESPONSES
@@ -22,6 +23,7 @@ from terraspectra_api.services.fields import load_fields
 from terraspectra_api.services.jobs import mark_job_cancelled, unmark_job_cancelled
 from terraspectra_api.services.queue import JobQueue
 from terraspectra_api.settings import Settings
+from terraspectra_api.storage import Storage
 from terraspectra_contracts import JobCreate, JobStatus, JobSummary, ZoneFeatureCollection
 from terraspectra_contracts.schemas import JobState
 
@@ -76,13 +78,23 @@ def _validate_aoi(aoi: dict[str, object]) -> None:
 
 @router.get("/jobs", operation_id="listJobs", response_model=list[JobStatus])
 def list_jobs(
+    status: JobState | None = Query(None, description="Filter jobs by state"),
+    scene_id: str | None = Query(None, description="Filter jobs by scene ID"),
+    field_id: str | None = Query(None, description="Filter jobs by field ID"),
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
     session: Session = Depends(get_session),
 ) -> list[JobStatus]:
-    """Jobs, newest first."""
+    """Jobs, newest first, with optional status/scene/field filtering."""
+    stmt = select(Job)
+    if status is not None:
+        stmt = stmt.where(Job.status == status)
+    if scene_id is not None:
+        stmt = stmt.where(Job.scene_id == scene_id)
+    if field_id is not None:
+        stmt = stmt.where(Job.field_id == field_id)
     rows = session.scalars(
-        select(Job).order_by(Job.created_at.desc(), Job.id.desc()).limit(limit).offset(offset)
+        stmt.order_by(Job.created_at.desc(), Job.id.desc()).limit(limit).offset(offset)
     )
     return [to_status(j) for j in rows]
 
@@ -303,4 +315,56 @@ def retry_job(
         redis,
     )
     return to_status(job)
+
+
+@router.delete(
+    "/jobs/{job_id}",
+    operation_id="deleteJob",
+    status_code=204,
+    responses={
+        204: {"description": "Job deleted and artifacts purged"},
+        404: ERROR_RESPONSES[404],
+        409: ERROR_RESPONSES[409],
+    },
+)
+def delete_job(
+    job_id: str,
+    session: Session = Depends(get_session),
+    storage: Storage = Depends(get_storage),
+    redis: object | None = Depends(get_redis),
+) -> Response:
+    """Delete a completed, failed, or cancelled job and purge its artifacts."""
+    job = get_job_or_404(session, job_id)
+    if job.status in (JobState.QUEUED, JobState.RUNNING):
+        raise ApiError(
+            409,
+            f"cannot delete active job in {job.status} state; cancel first",
+            "job_is_active",
+        )
+
+    # Purge artifacts from storage
+    try:
+        storage.delete(storage.job_dir(job.id))
+        if job.risk_path:
+            storage.delete(Path(job.risk_path))
+        if job.zones_path:
+            storage.delete(Path(job.zones_path))
+    except Exception as exc:
+        log.warning(
+            "failed to purge some job artifacts",
+            extra={"job_id": job.id, "error": str(exc)},
+        )
+
+    # Clean up Redis cancellation token & cached tiles
+    unmark_job_cancelled(job.id, redis)
+    if redis is not None and hasattr(redis, "scan_iter") and hasattr(redis, "delete"):
+        with contextlib.suppress(Exception):
+            tile_keys = list(redis.scan_iter(f"ts:tile:{job.id}:*"))
+            if tile_keys:
+                redis.delete(*tile_keys)
+
+    session.delete(job)
+    session.commit()
+    return Response(status_code=204)
+
 
