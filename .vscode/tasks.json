@@ -1,0 +1,67 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "1. Run API Backend (FastAPI)",
+      "type": "shell",
+      "command": "uv run terraspectra-api",
+      "options": {
+        "cwd": "${workspaceFolder}/api",
+        "env": {
+          "TS_QUEUE_MODE": "inline",
+          "TS_ENV": "development",
+          "TS_STORAGE_DIR": "./data",
+          "TS_MODEL_PATH": "../models/model.pt"
+        }
+      },
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "terraspectra"
+      }
+    },
+    {
+      "label": "2. Run GIS Dashboard (React Vite)",
+      "type": "shell",
+      "command": "npm run dev",
+      "options": {
+        "cwd": "${workspaceFolder}/dashboard"
+      },
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "terraspectra"
+      }
+    },
+    {
+      "label": "3. Run End-to-End System Verification",
+      "type": "shell",
+      "command": "uv run --project api python scripts/verify_e2e.py",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "4. Run All Unit Tests",
+      "type": "shell",
+      "command": "uv run --project api pytest -q; uv run --project model pytest -q; uv run --project pipeline pytest -q",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    }
+  ]
+}
