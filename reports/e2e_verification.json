@@ -1,12 +1,12 @@
 {
-  "timestamp": "2026-10-12T11:32:12.602320+00:00",
+  "timestamp": "2026-10-13T12:19:47.385758+00:00",
   "platform": "win32",
   "python_version": "3.11.9",
   "torch_version": "2.14.0+cpu",
   "steps": {
     "step1_pipeline": {
       "status": "PASSED",
-      "duration_s": 0.864,
+      "duration_s": 1.025,
       "cube_size_mb": 2.76,
       "dimensions": [
         128,
@@ -23,9 +23,9 @@
     },
     "step2_model": {
       "status": "PASSED",
-      "duration_s": 0.553,
+      "duration_s": 0.605,
       "model_size_mb": 3.02,
-      "latency_ms": 85.1,
+      "latency_ms": 94.0,
       "output_shapes": {
         "probs": [
           1,
@@ -43,9 +43,9 @@
     },
     "step3_api": {
       "status": "PASSED",
-      "duration_s": 2.566,
-      "scene_id": "scn_039147c0694348ed",
-      "job_id": "job_aa92827a41cd49c0",
+      "duration_s": 2.602,
+      "scene_id": "scn_f3efcb131bd84d0c",
+      "job_id": "job_e7db16d6dfde407f",
       "summary": {
         "acres_analyzed": 3642.828,
         "acres_at_risk": 193.039,
@@ -79,5 +79,5 @@
     }
   },
   "overall_status": "PASSED",
-  "total_duration_s": 3.986
+  "total_duration_s": 4.235
 }

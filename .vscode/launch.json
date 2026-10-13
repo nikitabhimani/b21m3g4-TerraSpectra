@@ -1,0 +1,31 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "API: FastAPI Server (Inline Worker)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "terraspectra_api",
+      "cwd": "${workspaceFolder}/api",
+      "env": {
+        "TS_QUEUE_MODE": "inline",
+        "TS_ENV": "development",
+        "TS_STORAGE_DIR": "./data",
+        "TS_MODEL_PATH": "../models/model.pt"
+      },
+      "jinja": true
+    },
+    {
+      "name": "Script: Verify End-to-End System",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/verify_e2e.py",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "TS_QUEUE_MODE": "inline",
+        "TS_ENV": "development",
+        "TS_MODEL_PATH": "models/model.pt"
+      }
+    }
+  ]
+}

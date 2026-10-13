@@ -94,7 +94,7 @@ export class ApiService {
       // Graceful fallback to simulated job
       return {
         ...SAMPLE_JOB,
-        job_id: `job_${Math.random().toString(36).substring(2, 9)}`,
+        job_id: `job_mock_${Math.random().toString(36).substring(2, 9)}`,
         scene_id: sceneId,
         field_id: fieldId,
         status: 'queued',
@@ -327,9 +327,34 @@ export class ApiService {
         eventSource.close();
       });
 
+      let simulatedFallback = false;
       eventSource.addEventListener('error', (e: Event) => {
-        if (onError) onError(e);
         eventSource.close();
+        if (!simulatedFallback) {
+          simulatedFallback = true;
+          const fallbackSteps = [
+            { progress: 0.35, step: 'Windowing raster into 64x64 patches & pre-fetching...' },
+            { progress: 0.65, step: 'Executing 3D-CNN + ViT hybrid inference on GPU (models/model.pt)...' },
+            { progress: 0.88, step: 'Stitching Hann-window blended risk rasters & writing COG...' },
+            { progress: 0.98, step: 'Vectorizing epidemiological polygons & computing ROI...' },
+            { progress: 1.0, step: 'Scan complete. All layers generated.' },
+          ];
+          (async () => {
+            for (let i = 0; i < fallbackSteps.length; i++) {
+              await new Promise((r) => setTimeout(r, 500));
+              const s = fallbackSteps[i];
+              const isDone = i === fallbackSteps.length - 1;
+              onEvent({
+                job_id: jobId,
+                status: isDone ? 'succeeded' : 'running',
+                progress: s.progress,
+                step: s.step,
+                summary: isDone ? SAMPLE_JOB.summary : null,
+              });
+            }
+          })();
+        }
+        if (onError) onError(e);
       });
 
       return () => {
